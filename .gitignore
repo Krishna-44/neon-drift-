@@ -1,0 +1,19 @@
+# Dependencies / build output
+node_modules/
+dist/
+*.local
+
+# Generated assets (recreated by `npm install` + `npm run setup`)
+public/mediapipe/
+public/models/*.task
+
+# Editor / OS noise
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Recordings & logs
+*.webm
+*.log

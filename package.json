@@ -1,0 +1,45 @@
+{
+  "name": "neondrift-gp",
+  "version": "1.0.0",
+  "description": "NEONDRIFT GP — gesture-controlled racing simulator. Webcam hand-tracking drives the car: no controller required.",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run typecheck && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "bench": "vitest bench --run",
+    "setup": "node scripts/fetch-model.mjs",
+    "postinstall": "node scripts/copy-assets.mjs",
+    "desktop": "npm run build && electron .",
+    "desktop:dev": "electron . --dev",
+    "desktop:smoke": "npm run build && electron . --smoke",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "relay": "node scripts/relay.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.18",
+    "three": "^0.180.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.180.0",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "vite": "^6.3.5",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "build": {
+    "appId": "com.neondrift.gp",
+    "productName": "NEONDRIFT GP",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "electron/**/*"],
+    "win": { "target": "nsis" }
+  }
+}
