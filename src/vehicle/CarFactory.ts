@@ -45,8 +45,18 @@ export function buildCar(accent: number, isPlayer: boolean): CarHandles {
     return o;
   };
 
+  // Lighter metallic paint tinted toward the car's accent, with a low emissive
+  // so the body always reads even on the dark night tracks (was near-black).
+  const accentCol = new THREE.Color(accent);
+  const paintCol = accentCol.clone().multiplyScalar(0.28).addScalar(0.06);
   const paint = keep(
-    new THREE.MeshStandardMaterial({ color: 0x0d0d16, metalness: 0.75, roughness: 0.32 }),
+    new THREE.MeshStandardMaterial({
+      color: paintCol,
+      metalness: 0.6,
+      roughness: 0.38,
+      emissive: accentCol.clone().multiplyScalar(0.5),
+      emissiveIntensity: 0.22,
+    }),
   );
   const accentMat = keep(new THREE.MeshBasicMaterial({ color: accent }));
   const glass = keep(new THREE.MeshStandardMaterial({ color: 0x05060a, metalness: 0.9, roughness: 0.12 }));

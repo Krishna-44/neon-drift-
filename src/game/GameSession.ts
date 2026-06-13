@@ -101,7 +101,7 @@ export class GameSession {
     this.renderer.setClearColor(0x05060f, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.55; // brighter — cars/track were too dark
 
     this.camera = new CameraRig(canvas.clientWidth / Math.max(canvas.clientHeight, 1));
     this.camera.mode = settings.camera === 'cockpit' ? 'cockpit' : 'chase';

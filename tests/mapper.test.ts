@@ -35,28 +35,31 @@ describe('GestureMapper — steering', () => {
     expect(out.gesture.wheelEngaged).toBe(true);
   });
 
-  it('turning right (positive user angle) → positive steer, proportional', () => {
+  // NB: steer is the NEGATED wheel angle — the car turns the way the user turns
+  // the wheel (fixes the reported left-input → right-turn inversion). So a
+  // positive makeWheelHands() angle yields negative steer and vice-versa.
+  it('wheel rotation maps proportionally to steer (corrected sign)', () => {
     const out = converge(mapper, (ts) => makeWheelHands(0.5, 'grip', 'grip', ts));
-    const expected = 0.5 / DEFAULT_SETTINGS.calibration.maxLockAngle; // ≈0.38 before dead-zone
-    expect(out.steer).toBeGreaterThan(expected - 0.12);
-    expect(out.steer).toBeLessThan(expected + 0.05);
+    const mag = 0.5 / DEFAULT_SETTINGS.calibration.maxLockAngle; // ≈0.38 before dead-zone
+    expect(out.steer).toBeLessThan(-(mag - 0.12)); // negative, proportional
+    expect(out.steer).toBeGreaterThan(-(mag + 0.12));
   });
 
-  it('turning left → negative steer', () => {
+  it('opposite wheel rotation flips steer sign', () => {
     const out = converge(mapper, (ts) => makeWheelHands(-0.6, 'grip', 'grip', ts));
-    expect(out.steer).toBeLessThan(-0.3);
+    expect(out.steer).toBeGreaterThan(0.3);
   });
 
   it('full lock clamps at ±1', () => {
     const out = converge(mapper, (ts) => makeWheelHands(1.45, 'grip', 'grip', ts));
-    expect(out.steer).toBeGreaterThan(0.9);
-    expect(out.steer).toBeLessThanOrEqual(1);
+    expect(out.steer).toBeLessThan(-0.9);
+    expect(out.steer).toBeGreaterThanOrEqual(-1);
   });
 
   it('sensitivity setting scales the response', () => {
     mapper.settings.steerSensitivity = 2;
     const out = converge(mapper, (ts) => makeWheelHands(0.45, 'grip', 'grip', ts));
-    expect(out.steer).toBeGreaterThan(0.55);
+    expect(out.steer).toBeLessThan(-0.55);
   });
 
   it('hands lost → steering coasts back to centre instead of snapping', () => {
@@ -84,10 +87,16 @@ describe('GestureMapper — gestures to controls', () => {
   let mapper: GestureMapper;
   beforeEach(() => (mapper = freshMapper()));
 
-  it('right thumb-down → throttle (deep angle = full throttle)', () => {
-    const out = converge(mapper, (ts) => makeWheelHands(0, 'grip', 'thumbDown', ts));
-    expect(out.throttle).toBeGreaterThan(0.85);
+  it('single fist → throttle (gas), no brake', () => {
+    const out = converge(mapper, (ts) => makeWheelHands(0, 'fist', 'grip', ts));
+    expect(out.throttle).toBeGreaterThanOrEqual(0.85);
     expect(out.reverse).toBe(false);
+    expect(out.brake).toBe(0);
+  });
+
+  it('BOTH fists → full throttle', () => {
+    const out = converge(mapper, (ts) => makeWheelHands(0, 'fist', 'fist', ts));
+    expect(out.throttle).toBe(1);
     expect(out.brake).toBe(0);
   });
 
@@ -97,22 +106,23 @@ describe('GestureMapper — gestures to controls', () => {
     expect(out.throttle).toBeGreaterThan(0.15);
   });
 
-  it('single fist near-straight → strong brake', () => {
-    const out = converge(mapper, (ts) => makeWheelHands(0, 'fist', 'grip', ts));
+  it('single thumb-down → strong brake', () => {
+    const out = converge(mapper, (ts) => makeWheelHands(0, 'grip', 'thumbDown', ts));
     expect(out.brake).toBeGreaterThanOrEqual(0.85);
+    expect(out.throttle).toBe(0);
     expect(out.handbrake).toBe(false);
   });
 
-  it('BOTH fists → maximum brake', () => {
-    const out = converge(mapper, (ts) => makeWheelHands(0, 'fist', 'fist', ts));
+  it('BOTH thumbs-down → maximum brake', () => {
+    const out = converge(mapper, (ts) => makeWheelHands(0, 'thumbDown', 'thumbDown', ts));
     expect(out.brake).toBe(1);
   });
 
-  it('fist + hard wheel tilt → drift (handbrake), not full brake', () => {
-    const out = converge(mapper, (ts) => makeWheelHands(0.95, 'fist', 'grip', ts));
+  it('thumb-down + hard wheel tilt → drift (handbrake), not full brake', () => {
+    const out = converge(mapper, (ts) => makeWheelHands(0.95, 'thumbDown', 'grip', ts));
     expect(out.handbrake).toBe(true);
     expect(out.brake).toBeLessThan(0.5);
-    expect(out.steer).toBeGreaterThan(0.45);
+    expect(Math.abs(out.steer)).toBeGreaterThan(0.45);
   });
 
   it('peace sign → nitro', () => {

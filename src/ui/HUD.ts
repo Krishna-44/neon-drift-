@@ -38,9 +38,9 @@ interface GestureFlags {
 
 const CHIP_DEFS: GestureChipDef[] = [
   { key: 'steer', label: 'STEER', icon: '🎮' },
-  { key: 'throttle', label: 'THROTTLE', icon: '⬇' },
-  { key: 'reverse', label: 'REVERSE', icon: '⬆' },
-  { key: 'brake', label: 'BRAKE', icon: '✊', cls: 'brake' },
+  { key: 'throttle', label: 'THROTTLE', icon: '✊' },
+  { key: 'reverse', label: 'REVERSE', icon: '👍' },
+  { key: 'brake', label: 'BRAKE', icon: '👎', cls: 'brake' },
   { key: 'nitro', label: 'NITRO', icon: '✌', cls: 'nitro' },
   { key: 'drift', label: 'DRIFT', icon: '🌀', cls: 'drift' },
 ];

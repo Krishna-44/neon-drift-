@@ -521,11 +521,11 @@ export class App {
   private showOnboarding(cfg: RaceConfig): void {
     const rows: [string, string, string][] = [
       ['🖐🖐', 'STEER', 'Hold both hands like a wheel — tilt to turn'],
-      ['👎', 'GAS', 'Right thumb DOWN · deeper = faster'],
-      ['✊', 'BRAKE', 'Make a fist (both fists = full stop)'],
+      ['✊', 'GAS', 'Close your fists (both fists = full throttle)'],
+      ['👎', 'BRAKE', 'Thumb DOWN (both thumbs = full stop)'],
+      ['👍', 'REVERSE', 'Thumb UP to back up'],
       ['✌️', 'NITRO', 'Peace sign for boost'],
-      ['✊+↪', 'DRIFT', 'Fist while turning hard'],
-      ['🖐', 'PAUSE', 'Open palm for 2 seconds'],
+      ['👎+↪', 'DRIFT', 'Thumb down while turning hard'],
     ];
     const grid = el('div', { class: 'gg-grid' },
       rows.map(([ico, t, d]) =>
@@ -748,9 +748,9 @@ export class App {
   private updateHints(): void {
     const HINTS = [
       '🖐🖐 Tilt both hands to <b>STEER</b>',
-      '👎 Thumb down = <b>GAS</b> · deeper = faster',
-      '✊ Fist = <b>BRAKE</b> · ✌️ = <b>NITRO</b>',
-      '✊ while turning hard = <b>DRIFT</b>',
+      '✊ Close your fists = <b>GAS</b> (both = full)',
+      '👎 Thumb down = <b>BRAKE</b> · ✌️ = <b>NITRO</b>',
+      '👍 Thumb up = <b>REVERSE</b> · 👎 + turn = <b>DRIFT</b>',
     ];
     const phase = this.session.racePhase;
     const t = this.session.getRaceTimeMs();

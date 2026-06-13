@@ -117,13 +117,14 @@ interface DemoScene {
 }
 
 const DEMO_SCRIPT: DemoScene[] = [
-  { duration: 2.5, leftPose: 'grip', rightPose: 'thumbDown', wheel: () => 0 },                       // launch straight
-  { duration: 4.0, leftPose: 'grip', rightPose: 'thumbDown', wheel: (t) => Math.sin(t * 0.9) * 0.5 },// sweepers
-  { duration: 1.6, leftPose: 'fist', rightPose: 'grip', wheel: () => 0 },                            // brake
-  { duration: 3.0, leftPose: 'grip', rightPose: 'thumbDown', wheel: (t) => Math.sin(t * 1.4) * 0.8 },// hard slalom
-  { duration: 2.0, leftPose: 'grip', rightPose: 'peace', wheel: () => 0.05 },                        // nitro
-  { duration: 2.4, leftPose: 'fist', rightPose: 'thumbDown', wheel: () => 0.85 },                    // drift right
-  { duration: 3.5, leftPose: 'grip', rightPose: 'thumbDown', wheel: (t) => Math.sin(t * 0.7) * 0.35 },
+  // Gesture map: fist = gas, thumbDown = brake, thumbUp = reverse, peace = nitro.
+  { duration: 2.5, leftPose: 'fist', rightPose: 'fist', wheel: () => 0 },                          // launch straight (full gas)
+  { duration: 4.0, leftPose: 'fist', rightPose: 'fist', wheel: (t) => Math.sin(t * 0.9) * 0.5 },   // gas through sweepers
+  { duration: 1.6, leftPose: 'thumbDown', rightPose: 'grip', wheel: () => 0 },                     // brake
+  { duration: 3.0, leftPose: 'fist', rightPose: 'fist', wheel: (t) => Math.sin(t * 1.4) * 0.8 },   // gas + hard slalom
+  { duration: 2.0, leftPose: 'fist', rightPose: 'peace', wheel: () => 0.05 },                      // gas + nitro
+  { duration: 2.4, leftPose: 'thumbDown', rightPose: 'grip', wheel: () => 0.85 },                  // brake-drift right
+  { duration: 3.5, leftPose: 'fist', rightPose: 'fist', wheel: (t) => Math.sin(t * 0.7) * 0.35 },  // cruise
 ];
 const DEMO_TOTAL = DEMO_SCRIPT.reduce((s, sc) => s + sc.duration, 0);
 

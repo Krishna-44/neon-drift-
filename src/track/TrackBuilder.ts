@@ -613,10 +613,11 @@ function addProps(
 export function applyEnvironment(scene: THREE.Scene, theme: ThemeConfig): { dispose: () => void } {
   const fog = new THREE.FogExp2(theme.fogColor, theme.fogDensity);
   scene.fog = fog;
-  const hemi = new THREE.HemisphereLight(theme.hemiSky, theme.hemiGround, theme.hemiIntensity);
-  const dir = new THREE.DirectionalLight(theme.dirColor, theme.dirIntensity);
+  // Brightened so cars + track read clearly (were too dark, esp. night themes).
+  const hemi = new THREE.HemisphereLight(theme.hemiSky, theme.hemiGround, theme.hemiIntensity + 0.5);
+  const dir = new THREE.DirectionalLight(theme.dirColor, theme.dirIntensity + 0.4);
   dir.position.set(...theme.dirPos);
-  const amb = new THREE.AmbientLight(0xffffff, 0.16);
+  const amb = new THREE.AmbientLight(0xffffff, 0.42);
   scene.add(hemi, dir, amb);
   return {
     dispose: () => {

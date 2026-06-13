@@ -396,11 +396,11 @@ export class HelpScreen {
   constructor(cb: { onBack(): void }) {
     const gestures: [string, string, string][] = [
       ['🖐🖐', 'Steer', 'Hold both hands like a wheel; rotate to turn'],
-      ['👎', 'Throttle', 'Right-hand thumb down — deeper = more gas'],
+      ['✊', 'Throttle', 'Close your fists — both fists = full gas'],
       ['👍', 'Reverse', 'Thumb up to select reverse gear'],
-      ['✊', 'Brake', 'Make a fist (both fists = max brake)'],
+      ['👎', 'Brake', 'Thumb down (both thumbs = max brake)'],
       ['✌️', 'Nitro', 'Peace / V sign for a boost'],
-      ['✊↘', 'Drift', 'Fist while turning hard pulls the handbrake'],
+      ['👎↘', 'Drift', 'Thumb down while turning hard = handbrake'],
       ['🖐', 'Pause', 'Hold an open palm for 2 seconds'],
     ];
     const guide = el('div', { class: 'gesture-guide' },

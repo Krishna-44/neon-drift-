@@ -1,26 +1,25 @@
 /**
  * Input translation engine: HandsState → ControlState.
  *
- * Gesture map (see README for the full chart):
- *   two hands apart            → virtual wheel; line angle = steering
- *   right(or either) thumbDown → throttle (angle-proportional)
- *   thumbUp                    → reverse request (gear engages when slow)
- *   fist (near-straight wheel) → brake; BOTH fists = max brake
- *   fist + wheel past ~45%     → drift / handbrake (spec: "tilt + fist combo")
- *   peace / V                  → nitro
- *   open palm held 2 s         → pause toggle
+ * Gesture map (user-tuned):
+ *   two hands apart   → virtual wheel; line angle = steering (turn the way you turn)
+ *   CLOSED FIST       → throttle / gas (both fists = full, one = strong)
+ *   THUMB UP          → reverse gear
+ *   THUMB DOWN        → brake; both = max; one + hard steer = handbrake drift
+ *   PEACE / V         → nitro
+ *   OPEN PALM held 2s → pause toggle
  *
- * Implements calibration offsets, dead-zone, expo, One-Euro smoothing,
- * slew limiting, velocity prediction (latency compensation) and occlusion
- * coast-down. Pure logic — fully unit-testable, no DOM access.
+ * Implements calibration offsets, dead-zone, One-Euro smoothing, slew limiting,
+ * velocity prediction (latency compensation) and occlusion coast-down. Pure
+ * logic — fully unit-testable, no DOM access.
  */
-import { clamp, clamp01, deadZone, expoCurve, DEG2RAD, RAD2DEG, remap, wrapAngle } from '../core/MathUtils';
+import { clamp, clamp01, deadZone, DEG2RAD, RAD2DEG, wrapAngle } from '../core/MathUtils';
 import { ControlState, neutralControlState } from './ControlState';
 import { OneEuroFilter } from '../vision/OneEuro';
 import { HoldDetector } from '../vision/GestureClassifier';
 import { featureVector, cosineSimilarity } from '../vision/HandFeatures';
 import type { CalibrationData, ControlSettings, CustomGestureSample } from '../core/Settings';
-import type { HandsState, TrackedHand } from '../vision/HandTypes';
+import type { HandsState } from '../vision/HandTypes';
 
 const PREDICT_HORIZON_S = 0.03; // extrapolate palms ~30 ms ahead (CV latency comp)
 const MAX_PREDICT_S = 0.06;
@@ -28,7 +27,6 @@ const DRIFT_STEER_THRESHOLD = 0.45;
 const STEER_SLEW_PER_S = 4.5; // full range in ~0.44 s
 const NO_HANDS_DECAY_HALFLIFE = 0.35;
 const ONE_HAND_DECAY_HALFLIFE = 0.9;
-const MIN_ACTIVE_THROTTLE = 0.22; // gesture-on floor so light thumb angles still move
 
 export class GestureMapper {
   private steerFilter = new OneEuroFilter(1.8, 0.9);
@@ -93,7 +91,9 @@ export class GestureMapper {
       // Vector user-left-hand → user-right-hand; image y is down, so a
       // clockwise wheel turn (turn right) pitches the right hand DOWN → +angle.
       const raw = Math.atan2(ry - ly, rx - lx);
-      const rel = wrapAngle(raw - this.calibration.neutralAngle);
+      // Negated so the car turns the way the user turns the wheel (fixes the
+      // reported left-input → right-turn inversion).
+      const rel = -wrapAngle(raw - this.calibration.neutralAngle);
       const norm = clamp((rel / this.calibration.maxLockAngle) * this.settings.steerSensitivity, -1, 1);
       const dzNorm = clamp((this.settings.deadZoneDeg * DEG2RAD) / this.calibration.maxLockAngle, 0, 0.4);
       const steerTarget = deadZone(norm, dzNorm);
@@ -117,37 +117,42 @@ export class GestureMapper {
     out.steer = clamp(this.steer, -1, 1);
 
     // ------------------------------------------------------------- gestures
-    const throttleHands: TrackedHand[] = [];
-    if (this.settings.throttleHand !== 'left' && right) throttleHands.push(right);
-    if (this.settings.throttleHand !== 'right' && left) throttleHands.push(left);
+    // Gesture map (user-tuned):
+    //   CLOSED FIST  → throttle / gas  (both fists = full, one = strong)
+    //   THUMB UP     → reverse gear
+    //   THUMB DOWN   → brake  (both = max; one + hard steer = handbrake drift)
+    //   PEACE / V    → nitro
+    //   OPEN PALM 2s → pause
+    const useRight = this.settings.throttleHand !== 'left';
+    const useLeft = this.settings.throttleHand !== 'right';
+    const leftFist = left?.pose === 'fist';
+    const rightFist = right?.pose === 'fist';
+    const fistCount = ((useLeft && leftFist) ? 1 : 0) + ((useRight && rightFist) ? 1 : 0);
 
     let throttle = 0;
     let reverse = false;
-    for (const h of throttleHands) {
-      if (h.pose === 'thumbDown') {
-        const angle = clamp(h.features.thumbDownAngle, 0, Math.PI / 2);
-        const raw = remap(angle, this.calibration.throttleMinAngle, this.calibration.throttleMaxAngle, MIN_ACTIVE_THROTTLE, 1);
-        throttle = Math.max(throttle, expoCurve(clamp01(raw), this.settings.throttleExpo));
-      } else if (h.pose === 'thumbUp') {
-        reverse = true;
-        const angle = clamp(-h.features.thumbDownAngle, 0, Math.PI / 2);
-        const raw = remap(angle, this.calibration.throttleMinAngle, this.calibration.throttleMaxAngle, MIN_ACTIVE_THROTTLE, 0.8);
-        throttle = Math.max(throttle, clamp01(raw));
-      }
+
+    // Throttle from closed fist(s): decisive arcade "go".
+    if (fistCount >= 2) throttle = 1;
+    else if (fistCount === 1) throttle = 0.85;
+
+    // Reverse on thumb-up (either hand) with a steady reverse throttle.
+    if (left?.pose === 'thumbUp' || right?.pose === 'thumbUp') {
+      reverse = true;
+      throttle = Math.max(throttle, 0.6);
     }
 
-    const leftFist = left?.pose === 'fist';
-    const rightFist = right?.pose === 'fist';
-    const anyFist = leftFist || rightFist;
+    // Brake on thumb-down. Thumb-down + hard steer = handbrake drift.
+    const leftDown = left?.pose === 'thumbDown';
+    const rightDown = right?.pose === 'thumbDown';
+    const anyDown = leftDown || rightDown;
     const steeringHard = Math.abs(out.steer) > DRIFT_STEER_THRESHOLD;
-
-    if (anyFist && steeringHard) {
-      // Spec: "hand tilt + fist combo" → drift (handbrake), light brake only.
+    if (anyDown && steeringHard) {
       out.handbrake = true;
       out.brake = Math.max(out.brake, 0.25);
-    } else if (leftFist && rightFist) {
+    } else if (leftDown && rightDown) {
       out.brake = 1;
-    } else if (anyFist) {
+    } else if (anyDown) {
       out.brake = Math.max(out.brake, 0.85);
     }
 
