@@ -621,6 +621,9 @@ export function applyEnvironment(scene: THREE.Scene, theme: ThemeConfig): { disp
   return {
     dispose: () => {
       scene.remove(hemi, dir, amb);
+      hemi.dispose();
+      dir.dispose();
+      amb.dispose();
       scene.fog = null;
     },
   };

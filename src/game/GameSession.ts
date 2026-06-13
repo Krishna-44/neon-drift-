@@ -546,11 +546,11 @@ export class GameSession {
     const car = buildCar(0x00f0ff, false);
     group.add(car.group);
 
-    // dramatic two-tone lighting
-    const hemi = new THREE.HemisphereLight(0x3a5a8a, 0x0a0a14, 0.8);
-    const key = new THREE.PointLight(0x00f0ff, 220, 60, 1.8);
+    // dramatic two-tone lighting (tracked via keep() so disposeShowroom frees them)
+    const hemi = keep(new THREE.HemisphereLight(0x3a5a8a, 0x0a0a14, 0.8));
+    const key = keep(new THREE.PointLight(0x00f0ff, 220, 60, 1.8));
     key.position.set(6, 7, 6);
-    const fill = new THREE.PointLight(0xff2bd6, 160, 60, 1.8);
+    const fill = keep(new THREE.PointLight(0xff2bd6, 160, 60, 1.8));
     fill.position.set(-7, 5, -5);
     group.add(hemi, key, fill);
 

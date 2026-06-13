@@ -36,6 +36,7 @@ export class GestureMapper {
   private pauseHold = new HoldDetector(2.0, 'open');
   private customDebounce = new Map<string, number>();
   private customActivePrev: string | null = null;
+  private customPauseFired: string | null = null;
   private lastUpdateT = -1;
 
   constructor(
@@ -49,6 +50,7 @@ export class GestureMapper {
     this.steer = 0;
     this.pauseHold.reset();
     this.customDebounce.clear();
+    this.customPauseFired = null;
     this.lastUpdateT = -1;
   }
 
@@ -157,9 +159,17 @@ export class GestureMapper {
     // (no thumb signal while palm is open).
     const palmPose = left?.pose === 'open' ? 'open' : right?.pose === 'open' ? 'open' : 'none';
     out.pauseFired = this.pauseHold.update(palmPose as any, now / 1000);
+    // Custom "pause" pose: latch so it fires ONCE per activation, not every
+    // frame it stays matched (otherwise it oscillates pause/resume since the
+    // mapper is polled in both the racing and paused update paths).
     if (out.gesture.customActive) {
       const action = this.customGestures.find((g) => g.label === out.gesture.customActive)?.action;
-      if (action === 'pause') out.pauseFired = true;
+      if (action === 'pause' && out.gesture.customActive !== this.customPauseFired) {
+        out.pauseFired = true;
+        this.customPauseFired = out.gesture.customActive;
+      }
+    } else {
+      this.customPauseFired = null; // re-arm once the pose is released
     }
     out.pauseHoldProgress = this.pauseHold.progress;
 

@@ -227,7 +227,10 @@ export class CameraManager {
     }
     cancelAnimationFrame(this.rafHandle);
     if (this.stream) {
-      for (const t of this.stream.getTracks()) t.stop();
+      for (const t of this.stream.getTracks()) {
+        t.onended = null; // drop the hot-unplug handler before stopping
+        t.stop();
+      }
       this.stream = null;
     }
     this.video.srcObject = null;

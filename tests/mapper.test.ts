@@ -164,6 +164,42 @@ describe('Custom gesture training', () => {
     }
     expect(trainer.build('nitro', 'bad')).toBeNull();
   });
+
+  it('a custom PAUSE gesture fires once per activation, not every held frame', () => {
+    // Regression: a held custom-pause pose used to set pauseFired every frame,
+    // which oscillated pause/resume because the mapper is polled in both the
+    // racing and paused update loops.
+    const trainer = new GestureTrainer();
+    for (let i = 0; i < 45; i++) {
+      const hand = makeTrackedHand('point', 'right', 0.5 + (i % 5) * 0.001, 0.5);
+      trainer.addSample(featureVector(hand.features));
+    }
+    const sample = trainer.build('pause', 'custom-pause')!;
+    const mapper = freshMapper();
+    mapper.customGestures = [sample];
+
+    // Hold the pose for 60 frames → exactly one pause edge.
+    let firedWhileHeld = 0;
+    for (let i = 0; i < 60; i++) {
+      const ts = i * (1000 / 60);
+      const out = mapper.update(makeWheelHands(0, 'grip', 'point', ts), ts);
+      if (out.pauseFired) firedWhileHeld++;
+    }
+    expect(firedWhileHeld).toBe(1);
+
+    // Release (grip both), then re-form the pose → it re-arms and fires again.
+    for (let i = 60; i < 80; i++) {
+      const ts = i * (1000 / 60);
+      mapper.update(makeWheelHands(0, 'grip', 'grip', ts), ts);
+    }
+    let firedSecond = 0;
+    for (let i = 80; i < 130; i++) {
+      const ts = i * (1000 / 60);
+      const out = mapper.update(makeWheelHands(0, 'grip', 'point', ts), ts);
+      if (out.pauseFired) firedSecond++;
+    }
+    expect(firedSecond).toBe(1);
+  });
 });
 
 describe('CalibrationSession', () => {
