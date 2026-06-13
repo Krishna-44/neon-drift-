@@ -67,8 +67,8 @@ export class MainMenu {
     };
     const buttons = el('div', { class: 'menu-buttons' }, [
       mkBtn('Race', cb.onPlay, true),
-      mkBtn('Calibrate Hands', cb.onCalibrate),
-      mkBtn('Gesture Training', cb.onTrain),
+      mkBtn('Set Up Gestures', cb.onTrain),
+      mkBtn('Calibrate Wheel', cb.onCalibrate),
       mkBtn('Settings', cb.onSettings),
       mkBtn('How To Play', cb.onHelp),
     ]);

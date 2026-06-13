@@ -4,6 +4,7 @@ import { GestureTrainer } from '../src/input/CustomGestures';
 import { CalibrationSession } from '../src/input/Calibration';
 import { DEFAULT_SETTINGS } from '../src/core/Settings';
 import { featureVector } from '../src/vision/HandFeatures';
+import { PersonalGestureClassifier, centroidOf } from '../src/input/PersonalGestures';
 import { emptyHands, makeWheelHands, makeTrackedHand } from './helpers';
 import type { ControlState } from '../src/input/ControlState';
 
@@ -209,6 +210,64 @@ describe('Custom gesture training', () => {
       if (out.pauseFired) firedSecond++;
     }
     expect(firedSecond).toBe(1);
+  });
+});
+
+describe('Personalised driving gestures (guided setup)', () => {
+  // Build a trained set by "recording" the synthetic pose templates, the way
+  // the guided setup wizard captures the user's own poses.
+  function recordSet() {
+    const pairs = [
+      ['idle', 'grip'],
+      ['throttle', 'fist'],
+      ['brake', 'thumbDown'],
+      ['reverse', 'thumbUp'],
+      ['nitro', 'peace'],
+    ] as const;
+    const classes = pairs.map(([action, pose]) => {
+      const samples: number[][] = [];
+      for (let i = 0; i < 30; i++) {
+        const hand = makeTrackedHand(pose, 'right', 0.5 + (i % 4) * 0.001, 0.5);
+        samples.push(featureVector(hand.features));
+      }
+      return { action, centroid: centroidOf(samples) };
+    });
+    return { trained: true, classes, trainedAt: 1 };
+  }
+
+  it('classifier separates fist / thumb-up / thumb-down / peace / idle', () => {
+    const clf = new PersonalGestureClassifier(recordSet() as any);
+    const check = (pose: any, expected: string) => {
+      const f = makeTrackedHand(pose, 'right', 0.5, 0.5).features;
+      expect(clf.classify(f).action, pose).toBe(expected);
+    };
+    check('grip', 'idle');
+    check('fist', 'throttle');
+    check('thumbDown', 'brake'); // the hard pair…
+    check('thumbUp', 'reverse'); // …must not collide with brake
+    check('peace', 'nitro');
+  });
+
+  it('mapper uses the personalised set: fist→throttle, thumbDown→brake, thumbUp→reverse', () => {
+    const mapper = new GestureMapper(
+      structuredClone(DEFAULT_SETTINGS.control),
+      structuredClone(DEFAULT_SETTINGS.calibration),
+      [],
+      recordSet() as any,
+    );
+    const run = (l: any, r: any) => {
+      let out!: ReturnType<GestureMapper['update']>;
+      for (let i = 0; i < 60; i++) {
+        const ts = i * (1000 / 60);
+        out = mapper.update(makeWheelHands(0, l, r, ts), ts);
+      }
+      return out;
+    };
+    expect(run('fist', 'fist').throttle).toBe(1);
+    expect(run('thumbDown', 'grip').brake).toBeGreaterThanOrEqual(0.85);
+    const rev = run('grip', 'thumbUp');
+    expect(rev.reverse).toBe(true);
+    expect(run('grip', 'peace').nitro).toBe(true);
   });
 });
 

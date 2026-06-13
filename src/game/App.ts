@@ -29,6 +29,7 @@ import { HUD } from '../ui/HUD';
 import { WebcamOverlay } from '../ui/WebcamOverlay';
 import { MainMenu, TrackSelect, SettingsScreen, PauseScreen, ResultsScreen, HelpScreen } from '../ui/Screens';
 import { CalibrationWizard, TrainingWizard } from '../ui/Wizards';
+import { GestureSetupWizard } from '../ui/GestureSetupWizard';
 import { TuningOverlay } from '../ui/TuningOverlay';
 import { CameraPrompt } from '../ui/CameraPrompt';
 import { CAR_COLORS, CAR_NAMES, CAR_STATS } from '../vehicle/CarFactory';
@@ -66,6 +67,7 @@ export class App {
   private helpScreen: HelpScreen;
   private calibration = new CalibrationWizard();
   private training = new TrainingWizard();
+  private gestureSetup = new GestureSetupWizard();
   private tuning: TuningOverlay;
   private camPrompt = new CameraPrompt();
   private lastCameraState: 'starting' | 'active' | 'denied' | 'unavailable' | 'lost' | 'idle' = 'idle';
@@ -76,6 +78,7 @@ export class App {
   private pendingRaceConfig: RaceConfig | null = null;
   private settingsReturnState: GameState = 'menu';
   private isRecording = false;
+  private gestureSetupActive = false;
 
   constructor(root: HTMLElement) {
     this.settings = new SettingsStore();
@@ -84,7 +87,12 @@ export class App {
     root.append(this.canvas);
 
     this.tracker = new HandTracker(this.camera);
-    this.mapper = new GestureMapper(this.settings.data.control, this.settings.data.calibration, this.settings.data.customGestures);
+    this.mapper = new GestureMapper(
+      this.settings.data.control,
+      this.settings.data.calibration,
+      this.settings.data.customGestures,
+      this.settings.data.drivingGestures,
+    );
     this.cursor = new GestureCursor(root);
 
     this.audio.setVolumes(this.settings.data.audio);
@@ -95,7 +103,7 @@ export class App {
     this.mainMenu = new MainMenu({
       onPlay: () => this.fsm.transition('trackSelect'),
       onCalibrate: () => this.startCalibration(),
-      onTrain: () => this.startTraining(),
+      onTrain: () => this.startGestureSetup(),
       onSettings: () => this.openSettings('menu'),
       onHelp: () => this.fsm.transition('help'),
       onCarPrev: () => this.cycleGarage(-1),
@@ -148,6 +156,7 @@ export class App {
       this.helpScreen.root,
       this.calibration.root,
       this.training.root,
+      this.gestureSetup.root,
       this.tuning.root,
       this.camPrompt.root,
       this.loadingScreen,
@@ -301,6 +310,11 @@ export class App {
         },
         onClose: () => {
           this.mainMenu.setCameraStatus('ok', 'Camera active');
+          // First time with a real camera → run the guided gesture setup so the
+          // game learns the user's own poses before they race.
+          if (!this.settings.data.gestureSetupDone && this.tracker.mode === 'camera') {
+            this.startGestureSetup();
+          }
         },
       },
       state,
@@ -421,23 +435,36 @@ export class App {
     );
   }
 
-  private startTraining(): void {
-    this.fsm.transition('training');
+  /** Guided gesture setup overlay (records the user's pose per driving action). */
+  private startGestureSetup(): void {
     const video = this.tracker.mode === 'camera' ? this.camera.video : null;
-    this.training.begin(
+    this.gestureSetupActive = true;
+    this.cursor.setActive(false);
+    this.gestureSetup.setVisible(true);
+    this.gestureSetup.begin(
       video,
       this.settings.data.control.mirrorPreview,
-      (sample) => {
+      (set) => {
         this.settings.update((s) => {
-          // one custom sample per action
-          s.customGestures = [...s.customGestures.filter((g) => g.action !== sample.action), sample];
+          s.drivingGestures = set;
+          s.gestureSetupDone = true;
         });
-        this.mapper.customGestures = this.settings.data.customGestures;
-        this.fsm.transition('menu');
-        this.hud.toast(`Gesture "${sample.label}" saved`, 'best');
+        this.mapper.setDrivingGestures(set);
+        this.endGestureSetup();
+        this.hud.toast('Gestures personalised ✓', 'best');
       },
-      () => this.fsm.transition('menu'),
+      () => {
+        // Skipped: remember so we don't nag on every launch (re-runnable from menu).
+        this.settings.update((s) => (s.gestureSetupDone = true));
+        this.endGestureSetup();
+      },
     );
+  }
+
+  private endGestureSetup(): void {
+    this.gestureSetupActive = false;
+    this.gestureSetup.setVisible(false);
+    if (this.fsm.is('menu', 'trackSelect', 'settings', 'help', 'paused')) this.cursor.setActive(true);
   }
 
   private cycleGarage(dir: number): void {
@@ -700,6 +727,11 @@ export class App {
   }
 
   private frameUpdate(frameDt: number): void {
+    // Guided gesture setup overlay (shown over the menu, outside the FSM).
+    if (this.gestureSetupActive) {
+      this.gestureSetup.feed(this.hands, frameDt);
+      return;
+    }
     // CV-driven UI everywhere
     if (this.fsm.is('calibration')) {
       this.calibration.feed(this.hands, frameDt);

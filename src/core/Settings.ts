@@ -3,6 +3,8 @@
  * Everything tunable from the UI lives here so calibration survives restarts.
  */
 
+import type { DrivingGestureSet } from '../input/PersonalGestures';
+
 export type GraphicsQuality = 'low' | 'medium' | 'high';
 export type CameraModeSetting = 'chase' | 'cockpit';
 
@@ -86,6 +88,10 @@ export interface GameSettings {
   seenOnboarding: boolean;
   /** Player car accent colour chosen in the garage carousel. */
   playerCarColor: number;
+  /** Guided gesture setup completed (records the user's own pose per action). */
+  gestureSetupDone: boolean;
+  /** Personalised driving-gesture centroids captured by the guided setup. */
+  drivingGestures: DrivingGestureSet;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -120,6 +126,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   cvProcessScale: 1,
   seenOnboarding: false,
   playerCarColor: 0x00f0ff,
+  gestureSetupDone: false,
+  drivingGestures: { trained: false, classes: [], trainedAt: 0 },
 };
 
 const STORAGE_KEY = 'neondrift-gp.settings.v1';

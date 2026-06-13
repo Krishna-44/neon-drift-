@@ -599,6 +599,12 @@ button.neon:active { transform: translateX(4px) scale(0.95); box-shadow: inset 0
 .results-table tbody tr:nth-child(8) { animation-delay: 0.40s; }
 @keyframes row-sweep { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
 
+/* ---- Guided gesture setup wizard ---- */
+.gsw-emoji { font-size: 64px; line-height: 1; filter: drop-shadow(0 0 22px rgba(0,240,255,0.5)); animation: gsw-bob 1.6s ease-in-out infinite; }
+@keyframes gsw-bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.gsw-title { font-size: 22px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-cyan); text-shadow: 0 0 16px rgba(0,240,255,0.5); }
+.gsw-count { font-size: 15px; letter-spacing: 0.08em; color: var(--c-amber); min-height: 20px; font-family: var(--mono); }
+
 /* ---- Camera permission / setup overlay ---- */
 .cv-badge.clickable { cursor: pointer; transition: color 0.15s, transform 0.12s; }
 .cv-badge.clickable:hover, .cv-badge.clickable.gesture-hover { color: var(--c-cyan); transform: scale(1.04); }

@@ -18,8 +18,9 @@ import { ControlState, neutralControlState } from './ControlState';
 import { OneEuroFilter } from '../vision/OneEuro';
 import { HoldDetector } from '../vision/GestureClassifier';
 import { featureVector, cosineSimilarity } from '../vision/HandFeatures';
+import { PersonalGestureClassifier, emptyDrivingSet, type DrivingGestureSet } from './PersonalGestures';
 import type { CalibrationData, ControlSettings, CustomGestureSample } from '../core/Settings';
-import type { HandsState } from '../vision/HandTypes';
+import type { HandsState, HandPose, TrackedHand } from '../vision/HandTypes';
 
 const PREDICT_HORIZON_S = 0.03; // extrapolate palms ~30 ms ahead (CV latency comp)
 const MAX_PREDICT_S = 0.06;
@@ -40,11 +41,41 @@ export class GestureMapper {
   /** Live introspection for the tuning overlay (raw vs. filtered signals). */
   readonly debug = { steerRaw: 0, steerSmoothed: 0, throttle: 0, brake: 0, wheelAngleDeg: 0 };
 
+  private driveClassifier: PersonalGestureClassifier;
+
   constructor(
     public settings: ControlSettings,
     public calibration: CalibrationData,
     public customGestures: CustomGestureSample[] = [],
-  ) {}
+    drivingGestures: DrivingGestureSet = emptyDrivingSet(),
+  ) {
+    this.driveClassifier = new PersonalGestureClassifier(drivingGestures);
+  }
+
+  /** Swap in a freshly-trained personal gesture set (from the guided setup). */
+  setDrivingGestures(set: DrivingGestureSet): void {
+    this.driveClassifier = new PersonalGestureClassifier(set);
+  }
+
+  /**
+   * Effective driving pose for a hand: the user's PERSONALISED classification
+   * when the guided setup has been done, otherwise the built-in rule classifier.
+   * Open-palm is always taken from the built-in classifier (used for pause and
+   * wheel-disengage; never part of the trained driving set).
+   */
+  private drivePose(hand: TrackedHand | null): HandPose {
+    if (!hand) return 'none';
+    if (hand.pose === 'open') return 'open';
+    if (!this.driveClassifier.isTrained) return hand.pose;
+    const action = this.driveClassifier.classify(hand.features).action;
+    switch (action) {
+      case 'throttle': return 'fist';
+      case 'brake': return 'thumbDown';
+      case 'reverse': return 'thumbUp';
+      case 'nitro': return 'peace';
+      default: return 'grip'; // idle
+    }
+  }
 
   reset(): void {
     this.steerFilter.reset();
@@ -123,10 +154,13 @@ export class GestureMapper {
     //   THUMB DOWN   → brake  (both = max; one + hard steer = handbrake drift)
     //   PEACE / V    → nitro
     //   OPEN PALM 2s → pause
+    // Effective driving pose per hand (personalised when the guided setup is done).
+    const leftPose = this.drivePose(left);
+    const rightPose = this.drivePose(right);
     const useRight = this.settings.throttleHand !== 'left';
     const useLeft = this.settings.throttleHand !== 'right';
-    const leftFist = left?.pose === 'fist';
-    const rightFist = right?.pose === 'fist';
+    const leftFist = leftPose === 'fist';
+    const rightFist = rightPose === 'fist';
     const fistCount = ((useLeft && leftFist) ? 1 : 0) + ((useRight && rightFist) ? 1 : 0);
 
     let throttle = 0;
@@ -137,14 +171,14 @@ export class GestureMapper {
     else if (fistCount === 1) throttle = 0.85;
 
     // Reverse on thumb-up (either hand) with a steady reverse throttle.
-    if (left?.pose === 'thumbUp' || right?.pose === 'thumbUp') {
+    if (leftPose === 'thumbUp' || rightPose === 'thumbUp') {
       reverse = true;
       throttle = Math.max(throttle, 0.6);
     }
 
     // Brake on thumb-down. Thumb-down + hard steer = handbrake drift.
-    const leftDown = left?.pose === 'thumbDown';
-    const rightDown = right?.pose === 'thumbDown';
+    const leftDown = leftPose === 'thumbDown';
+    const rightDown = rightPose === 'thumbDown';
     const anyDown = leftDown || rightDown;
     const steeringHard = Math.abs(out.steer) > DRIFT_STEER_THRESHOLD;
     if (anyDown && steeringHard) {
@@ -156,9 +190,10 @@ export class GestureMapper {
       out.brake = Math.max(out.brake, 0.85);
     }
 
-    // Nitro: default = peace/V on either hand; replaced by a trained custom pose if present.
+    // Nitro: default = peace/V on either hand (personalised pose if trained);
+    // replaced by a custom-trained pose if one was bound.
     const customNitro = this.customGestures.some((g) => g.action === 'nitro');
-    if (!customNitro && (left?.pose === 'peace' || right?.pose === 'peace')) out.nitro = true;
+    if (!customNitro && (leftPose === 'peace' || rightPose === 'peace')) out.nitro = true;
 
     // Custom gestures (trained centroids, cosine match + debounce).
     out.gesture.customActive = this.matchCustom(hands, now);
