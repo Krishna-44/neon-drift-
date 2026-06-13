@@ -1,0 +1,54 @@
+/* Live gesture tuning / diagnostics overlay (scoped; press T in-race) */
+.tuning-overlay {
+  position: absolute;
+  top: 50%;
+  left: 24px;
+  transform: translateY(-50%);
+  width: 320px;
+  pointer-events: auto;
+  background: rgba(6, 10, 22, 0.82);
+  border: 1px solid rgba(0, 240, 255, 0.32);
+  border-radius: 14px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(0, 240, 255, 0.05);
+  font-family: 'Consolas', 'SF Mono', monospace;
+  color: #dff6ff;
+  padding: 14px 16px;
+  z-index: 70;
+  animation: tuning-in 0.22s ease-out;
+}
+@keyframes tuning-in { from { opacity: 0; transform: translate(-12px, -50%); } to { opacity: 1; transform: translate(0, -50%); } }
+.tuning-overlay.hidden { display: none; }
+
+.tuning-overlay h4 {
+  margin: 0 0 10px; font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: #00f0ff; display: flex; justify-content: space-between; align-items: center;
+}
+.tuning-overlay h4 .kbd { font-size: 10px; color: #7da6bd; border: 1px solid rgba(125,166,189,0.3); border-radius: 4px; padding: 1px 5px; }
+
+.tuning-graph { width: 100%; height: 54px; display: block; border-radius: 8px; background: rgba(2,3,10,0.6); margin-bottom: 4px; }
+.tuning-legend { display: flex; gap: 14px; font-size: 10px; color: #7da6bd; margin-bottom: 10px; }
+.tuning-legend i { display: inline-block; width: 16px; height: 2px; vertical-align: middle; margin-right: 4px; }
+
+.tuning-row { display: flex; justify-content: space-between; font-size: 11px; padding: 3px 0; border-bottom: 1px solid rgba(125,166,189,0.08); }
+.tuning-row .lbl { color: #7da6bd; }
+.tuning-row .v { color: #fff; font-variant-numeric: tabular-nums; }
+.tuning-row .v.good { color: #3affd1; }
+.tuning-row .v.warn { color: #ffb648; }
+.tuning-row .v.bad { color: #ff3b5c; }
+
+.tuning-pose { display: flex; gap: 6px; margin: 8px 0; }
+.tuning-pose .p { flex: 1; text-align: center; border-radius: 8px; padding: 6px 4px; background: rgba(2,3,10,0.5); border: 1px solid rgba(125,166,189,0.15); }
+.tuning-pose .p .role { font-size: 9px; letter-spacing: 0.12em; color: #7da6bd; }
+.tuning-pose .p .pose { font-size: 13px; font-weight: 700; margin: 2px 0; }
+.tuning-pose .p.left { border-color: rgba(255,43,214,0.4); } .tuning-pose .p.left .pose { color: #ff2bd6; }
+.tuning-pose .p.right { border-color: rgba(0,240,255,0.4); } .tuning-pose .p.right .pose { color: #00f0ff; }
+.tuning-pose .conf { height: 3px; border-radius: 2px; background: rgba(125,166,189,0.2); overflow: hidden; margin-top: 4px; }
+.tuning-pose .conf i { display: block; height: 100%; background: currentColor; }
+
+.tuning-sliders { margin-top: 10px; }
+.tuning-sliders .ts { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+.tuning-sliders .ts label { flex: 0 0 92px; font-size: 10px; color: #7da6bd; }
+.tuning-sliders .ts input[type=range] { flex: 1; accent-color: #00f0ff; height: 3px; }
+.tuning-sliders .ts .num { flex: 0 0 34px; text-align: right; font-size: 10px; color: #00f0ff; }
+.tuning-hint { font-size: 10px; color: #7da6bd; margin-top: 8px; line-height: 1.4; }

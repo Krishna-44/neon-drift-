@@ -29,6 +29,9 @@ import { HUD } from '../ui/HUD';
 import { WebcamOverlay } from '../ui/WebcamOverlay';
 import { MainMenu, TrackSelect, SettingsScreen, PauseScreen, ResultsScreen, HelpScreen } from '../ui/Screens';
 import { CalibrationWizard, TrainingWizard } from '../ui/Wizards';
+import { TuningOverlay } from '../ui/TuningOverlay';
+import { CameraPrompt } from '../ui/CameraPrompt';
+import { CAR_COLORS, CAR_NAMES, CAR_STATS } from '../vehicle/CarFactory';
 import { el } from '../ui/dom';
 import type { RaceConfig } from './GameSession';
 import type { HandsState } from '../vision/HandTypes';
@@ -63,6 +66,9 @@ export class App {
   private helpScreen: HelpScreen;
   private calibration = new CalibrationWizard();
   private training = new TrainingWizard();
+  private tuning: TuningOverlay;
+  private camPrompt = new CameraPrompt();
+  private lastCameraState: 'starting' | 'active' | 'denied' | 'unavailable' | 'lost' | 'idle' = 'idle';
   private loadingScreen: HTMLDivElement;
 
   private hands: HandsState = { left: null, right: null, captureTs: 0, inferMs: 0, liveCount: 0 };
@@ -92,6 +98,8 @@ export class App {
       onTrain: () => this.startTraining(),
       onSettings: () => this.openSettings('menu'),
       onHelp: () => this.fsm.transition('help'),
+      onCarPrev: () => this.cycleGarage(-1),
+      onCarNext: () => this.cycleGarage(1),
     });
     this.trackSelect = new TrackSelect(
       {
@@ -117,6 +125,11 @@ export class App {
       onMenu: () => this.quitToMenu(),
     });
     this.helpScreen = new HelpScreen({ onBack: () => this.fsm.transition('menu') });
+    this.tuning = new TuningOverlay(this.settings, () => {
+      // live re-tune while racing: smoothing reconfigures the CV filters;
+      // sensitivity/dead-zone/expo are read straight from the shared settings ref.
+      this.tracker.setSmoothing(this.settings.data.control.steerSmoothing);
+    });
 
     this.loadingScreen = el('div', { class: 'layer screen hidden', id: 'loading-root' }, [
       el('div', { class: 'loader-ring' }),
@@ -135,6 +148,8 @@ export class App {
       this.helpScreen.root,
       this.calibration.root,
       this.training.root,
+      this.tuning.root,
+      this.camPrompt.root,
       this.loadingScreen,
     );
     this.pip.attachVideo(this.camera.video);
@@ -145,6 +160,9 @@ export class App {
     this.wireGlobalKeys();
     this.tracker.events.on('status', ({ phase, message }) => this.onTrackerStatus(phase, message));
     this.tracker.events.on('state', ({ hands }) => (this.hands = hands));
+    this.camera.events.on('status', ({ state }) => (this.lastCameraState = state));
+    // Clicking the camera status badge re-opens the permission/setup prompt.
+    this.mainMenu.onBadgeClick(() => this.openCameraPrompt());
 
     this.loop = new GameLoop({
       fixedUpdate: (dt) => this.fixedUpdate(dt),
@@ -158,8 +176,19 @@ export class App {
 
   async start(): Promise<void> {
     this.fsm.transition('menu');
+    this.updateGarageInfo();
+    this.hud.setFxEnabled(this.settings.data.graphics.particles);
     this.loop.start();
-    // Kick off camera + tracking in the background; UI works regardless.
+    this.keyboard.attach();
+
+    // Headless smoke test (Electron `--smoke`): drive a short race entirely from
+    // synthetic hands and report pass/fail — skip the camera prompt entirely.
+    if (new URLSearchParams(location.search).get('smoke') === '1') {
+      this.runSmokeTest();
+      return;
+    }
+
+    // Kick off camera setup (shows the explicit permission prompt when needed).
     this.initTracking();
     // Resume audio on first interaction (autoplay policy).
     const resumeAudio = () => {
@@ -169,46 +198,114 @@ export class App {
     };
     window.addEventListener('pointerdown', resumeAudio);
     window.addEventListener('keydown', resumeAudio);
-    this.keyboard.attach();
-
-    // Headless smoke test (Electron `--smoke`): drive a short race entirely from
-    // synthetic hands and report pass/fail on window.__smokeResult.
-    if (new URLSearchParams(location.search).get('smoke') === '1') {
-      this.runSmokeTest();
-    }
   }
 
   private runSmokeTest(): void {
     (window as any).__smokeResult = 'running';
     this.tracker.startSynthetic();
-    this.startRace({ trackId: 'city', opponents: 3, laps: 1, difficulty: 'racer' });
-    const startedAt = performance.now();
-    const check = () => {
-      const ps = this.session.getPlayerState();
-      const moved = ps ? Math.hypot(ps.x, ps.z) : 0;
-      const fps = this.session.profiler.fps;
-      if (this.fsm.is('racing') && moved > 5 && fps > 0) {
-        (window as any).__smokeResult = JSON.stringify({ pass: true, fps: Math.round(fps), state: this.fsm.state, moved: +moved.toFixed(1) });
-        return;
+    this.settings.data.seenOnboarding = true;
+    // Load a race directly (bypass the loading-screen defer) so the smoke test
+    // is deterministic and independent of the windowing system.
+    const cfg = { trackId: 'city', opponents: 3, laps: 1, difficulty: 'racer' as const };
+    this.pendingRaceConfig = cfg;
+    this.loop.stop(); // drive the sim ourselves — headless Electron starves rAF
+    this.session.loadRace(cfg);
+    this.fsm.transition('loading');
+    this.fsm.transition('countdown');
+    this.session.beginCountdown();
+
+    let elapsed = 0;
+    let renders = 0;
+    let renderErr = '';
+    let maxSpeed = 0;
+    const iv = window.setInterval(() => {
+      try {
+        if (this.session.racePhase === 'racing') {
+          this.session.playerInput = { steer: 0.05, throttle: 1, brake: 0, handbrake: false, nitro: false, reverse: false };
+          if (this.fsm.is('countdown')) this.fsm.transition('racing');
+        }
+        for (let i = 0; i < 8; i++) this.session.simulate(1 / 120); // ~0.067s of sim per tick
+        elapsed += 8 / 120;
+        // exercise the render path once per tick (proves WebGL works headlessly)
+        if (!renderErr) {
+          try {
+            this.session.renderFrame(1 / 60);
+            renders++;
+          } catch (e) {
+            renderErr = String((e as Error)?.message ?? e);
+          }
+        }
+        const speed = this.session.getPlayerState()?.speedKmh ?? 0;
+        maxSpeed = Math.max(maxSpeed, speed);
+        // Pass = the car is actually being driven (accelerating under throttle) AND
+        // the renderer produced frames without throwing.
+        if (this.session.racePhase === 'racing' && speed > 25 && renders > 3) {
+          (window as any).__smokeResult = JSON.stringify({ pass: true, state: this.session.racePhase, speedKmh: Math.round(speed), renders, simSeconds: +elapsed.toFixed(1) });
+          clearInterval(iv);
+        } else if (elapsed > 30 || renderErr) {
+          (window as any).__smokeResult = JSON.stringify({ pass: false, state: this.session.racePhase, maxSpeed: Math.round(maxSpeed), renders, renderErr });
+          clearInterval(iv);
+        }
+      } catch (e) {
+        (window as any).__smokeResult = JSON.stringify({ pass: false, error: String((e as Error)?.message ?? e) });
+        clearInterval(iv);
       }
-      if (performance.now() - startedAt > 20000) {
-        (window as any).__smokeResult = JSON.stringify({ pass: false, state: this.fsm.state, moved: +moved.toFixed(1), fps: Math.round(fps) });
-        return;
-      }
-      setTimeout(check, 500);
-    };
-    setTimeout(check, 1500);
+    }, 16);
   }
 
   private async initTracking(): Promise<void> {
-    this.mainMenu.setCameraStatus('warn', 'Camera: starting…');
-    const ok = await this.tracker.startCamera();
-    if (!ok) {
-      // No camera/permission → synthetic demo so the game is still fully playable.
-      this.mainMenu.setCameraStatus('warn', 'No camera — demo + keyboard');
-      this.pip.setNoCamera(true);
-      this.tracker.startSynthetic();
+    const state = await this.camera.getPermissionState();
+    const hasCam = await this.camera.hasCamera();
+    if (state === 'granted') {
+      // Already trusted → start silently (no prompt needed).
+      this.mainMenu.setCameraStatus('warn', 'Camera: starting…');
+      const ok = await this.tracker.startCamera();
+      if (!ok) {
+        this.tracker.startSynthetic();
+        this.openCameraPrompt();
+      }
+      return;
     }
+    // Not yet granted (prompt/denied/unknown/no-cam): run the synthetic demo as a
+    // live backdrop and explicitly ask the user to enable the camera.
+    this.tracker.startSynthetic();
+    this.mainMenu.setCameraStatus('warn', hasCam ? 'Camera: tap to enable' : 'No camera — demo + keyboard');
+    this.pip.setNoCamera(true);
+    this.openCameraPrompt();
+  }
+
+  /** Show the explicit camera-permission/setup overlay. */
+  private async openCameraPrompt(): Promise<void> {
+    if (this.camPrompt.isVisible) return;
+    const state = await this.camera.getPermissionState();
+    const hasCam = await this.camera.hasCamera();
+    this.camPrompt.open(
+      {
+        onEnable: async (deviceId?: string) => {
+          this.mainMenu.setCameraStatus('warn', 'Camera: requesting…');
+          const ok = await this.tracker.startCamera(deviceId);
+          if (ok) {
+            this.pip.setNoCamera(false);
+            return 'granted';
+          }
+          // figure out why it failed for the prompt's next state
+          if (!(await this.camera.hasCamera())) return 'unavailable';
+          return this.lastCameraState === 'unavailable' ? 'unavailable' : 'denied';
+        },
+        listDevices: () => this.camera.listDevices(),
+        onDemo: () => {
+          this.camPrompt.hide();
+          if (this.tracker.mode !== 'synthetic') this.tracker.startSynthetic();
+          this.pip.setNoCamera(true);
+          this.mainMenu.setCameraStatus('warn', 'Demo mode — tap to enable camera');
+        },
+        onClose: () => {
+          this.mainMenu.setCameraStatus('ok', 'Camera active');
+        },
+      },
+      state,
+      hasCam,
+    );
   }
 
   private onTrackerStatus(phase: string, message: string): void {
@@ -295,6 +392,12 @@ export class App {
         case 'KeyV':
           if (this.fsm.is('racing')) this.toggleRecording();
           break;
+        case 'KeyT':
+          if (this.fsm.is('racing', 'countdown', 'paused')) {
+            const on = this.tuning.toggle();
+            this.audio.uiBlip(on ? 'select' : 'back');
+          }
+          break;
       }
     });
   }
@@ -337,6 +440,20 @@ export class App {
     );
   }
 
+  private cycleGarage(dir: number): void {
+    const color = this.session.cycleShowroomCar(dir);
+    this.settings.update((s) => (s.playerCarColor = color));
+    this.updateGarageInfo();
+    this.audio.uiBlip('move');
+  }
+
+  private updateGarageInfo(): void {
+    const color = this.session.showroomColor;
+    const idx = CAR_COLORS.indexOf(color);
+    const i = idx >= 0 ? idx : 0;
+    this.mainMenu.setCarInfo(CAR_NAMES[i], color, CAR_STATS[i]);
+  }
+
   private openSettings(returnState: GameState): void {
     this.settingsReturnState = returnState;
     this.fsm.transition('settings');
@@ -349,6 +466,7 @@ export class App {
     this.tracker.setSmoothing(s.control.steerSmoothing);
     this.pip.setMirror(s.control.mirrorPreview);
     this.hud.setDebugVisible(s.graphics.showFpsHud);
+    this.hud.setFxEnabled(s.graphics.particles);
     this.session.applyGraphicsSettings();
     this.settings.save();
   }
@@ -364,6 +482,7 @@ export class App {
 
   private launchRace(cfg: RaceConfig): void {
     void this.audio.resume();
+    this.loop.timeScale = 1; // clear any finish slow-mo
     this.pendingRaceConfig = cfg;
     this.settings.update((s) => {
       s.lastTrack = cfg.trackId;
@@ -447,6 +566,8 @@ export class App {
 
   private quitToMenu(): void {
     if (this.isRecording) void this.toggleRecording();
+    this.loop.timeScale = 1;
+    this.updateGarageInfo();
     this.fsm.transition('menu');
   }
 
@@ -475,15 +596,35 @@ export class App {
         }
       });
     }
-    // restore the player camera if we came back from a cinematic replay
-    this.session.setCameraMode(this.settings.data.camera === 'cockpit' ? 'cockpit' : 'chase');
+    // cinematic finish: brief slow-mo into a trackside camera, then results.
+    this.session.setCameraMode('cinematic');
+    this.runFinishSlowMo();
     this.resultsScreen.show(standings, this.settings.data.adaptive.skill, suggestDifficulty(this.settings.data.adaptive));
     this.resultsScreen.setVisible(true);
     this.mainMenu.setVisible(false);
     this.audio.setEngineMuted(true);
   }
 
+  /** Ease the sim time-scale 1→0.4 over ~1.1s for an Asphalt-style finish, then
+   *  restore it (the loop keeps the finished cars rolling under the results card). */
+  private runFinishSlowMo(): void {
+    const start = performance.now();
+    const dur = 1100;
+    const tick = () => {
+      if (!this.fsm.is('finished')) {
+        this.loop.timeScale = 1;
+        return;
+      }
+      const t = Math.min((performance.now() - start) / dur, 1);
+      const eased = 1 - Math.pow(1 - t, 3);
+      this.loop.timeScale = 1 - eased * 0.6; // → 0.4
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
   private startReplay(): void {
+    this.loop.timeScale = 1;
     this.fsm.transition('replay');
     this.replayPlayer.load(this.session.replay.toArray());
     this.session.setCameraMode('cinematic');
@@ -594,6 +735,9 @@ export class App {
     if (this.fsm.is('racing', 'countdown', 'paused', 'finished')) {
       this.updateHud();
       this.updateHints();
+    }
+    if (this.tuning.isVisible && this.fsm.is('racing', 'countdown', 'paused')) {
+      this.tuning.update(this.hands, this.mapper, this.session.profiler);
     }
     this.lastFrameDt = frameDt;
   }

@@ -18,6 +18,7 @@ import type { Profiler } from '../core/Profiler';
 const GAUGE_MAX_KMH = 260;
 const SPEEDO_START = 135; // deg
 const SPEEDO_SWEEP = 270;
+const NITRO_SEGMENTS = 14;
 
 interface GestureChipDef {
   key: keyof GestureFlags;
@@ -50,7 +51,9 @@ export class HUD {
   private rpmArc: SVGPathElement;
   private speedArc: SVGPathElement;
   private gearVal: HTMLElement;
-  private nitroFill: HTMLElement;
+  private nitroGauge!: HTMLElement;
+  private nitroSegEls: HTMLElement[] = [];
+  private posChip!: HTMLElement;
   private posVal: HTMLElement;
   private posTotal: HTMLElement;
   private lapVal: HTMLElement;
@@ -68,6 +71,17 @@ export class HUD {
   private countdownLayer: HTMLDivElement;
   private toastStack: HTMLDivElement;
   private wrongWayEl: HTMLDivElement;
+  private motionCanvas!: HTMLCanvasElement;
+  private motionCtx!: CanvasRenderingContext2D;
+  private motionLines: { x: number; y: number; angle: number; len: number; t: number; life: number; color: string }[] = [];
+  private motionEmitAccum = 0;
+  private nitroFlash!: HTMLDivElement;
+  private deltaPopups!: HTMLDivElement;
+  private driftFlare!: HTMLDivElement;
+  private lastPos = 0;
+  private lastLapCount = 0;
+  private lastDriftFlare = false;
+  private fxEnabled = true;
   private debugVisible = true;
   private minimapBuilt = false;
   private minimapTransform = { ox: 0, oz: 0, scale: 1, size: 168 };
@@ -87,10 +101,17 @@ export class HUD {
     const gearBox = el('div', { class: 'gear-box' }, [this.gearVal, el('div', { class: 'gear-label', textContent: 'GEAR' })]);
     const cluster = el('div', { class: 'hud-cluster' }, [speedo, gearBox]);
 
-    // nitro
-    this.nitroFill = el('i', { class: 'nitro-fill' });
+    // nitro — Asphalt-style segmented gauge (fills L→R, flares when active)
+    this.nitroSegEls = [];
+    const segWrap = el('div', { class: 'nitro-segs' });
+    for (let i = 0; i < NITRO_SEGMENTS; i++) {
+      const seg = el('i', { class: 'nseg' });
+      this.nitroSegEls.push(seg);
+      segWrap.append(seg);
+    }
+    this.nitroGauge = segWrap;
     const nitroWrap = el('div', { class: 'nitro-wrap' }, [
-      el('div', { class: 'nitro-bar' }, [this.nitroFill]),
+      segWrap,
       el('div', { class: 'nitro-label', textContent: 'NITRO' }),
     ]);
 
@@ -99,11 +120,12 @@ export class HUD {
     this.posTotal = el('span', { class: 'small', textContent: '/1' });
     this.lapVal = el('span', { textContent: '1' });
     this.lapTotal = el('span', { class: 'small', textContent: '/3' });
+    this.posChip = el('div', { class: 'info-chip pos' }, [
+      el('div', { class: 'ic-big' }, [this.posVal, this.posTotal]),
+      el('div', { class: 'ic-label', textContent: 'Position' }),
+    ]);
     const raceInfo = el('div', { class: 'race-info' }, [
-      el('div', { class: 'info-chip pos' }, [
-        el('div', { class: 'ic-big' }, [this.posVal, this.posTotal]),
-        el('div', { class: 'ic-label', textContent: 'Position' }),
-      ]),
+      this.posChip,
       el('div', { class: 'info-chip' }, [
         el('div', { class: 'ic-big' }, [this.lapVal, this.lapTotal]),
         el('div', { class: 'ic-label', textContent: 'Lap' }),
@@ -157,12 +179,37 @@ export class HUD {
     this.hintStrip = el('div', { class: 'hint-strip hidden' });
     this.noHandsEl = el('div', { class: 'nohands hidden', html: '✋ ✋ &nbsp;SHOW BOTH HANDS TO THE CAMERA' });
 
+    // speed-reactive FX: motion-line canvas (behind HUD chrome) + nitro flash
+    this.motionCanvas = el('canvas', { class: 'motion-fx' });
+    this.motionCtx = this.motionCanvas.getContext('2d')!;
+    this.nitroFlash = el('div', { class: 'nitro-flash' });
+    this.deltaPopups = el('div', { class: 'delta-popups' });
+    this.driftFlare = el('div', { class: 'drift-flare hidden' });
+
     this.root = el('div', { class: 'layer', id: 'hud' }, [
+      this.motionCanvas, this.nitroFlash,
       cluster, nitroWrap, raceInfo, timing, gesturePanel, wheelWrap, minimap,
       this.debugPanel, this.countdownLayer, this.toastStack, this.wrongWayEl,
-      this.hintStrip, this.noHandsEl,
+      this.hintStrip, this.noHandsEl, this.deltaPopups, this.driftFlare,
     ]);
+    this.resizeFx();
+    window.addEventListener('resize', () => this.resizeFx());
     void this.wheelAngleText;
+  }
+
+  private resizeFx(): void {
+    this.motionCanvas.width = window.innerWidth;
+    this.motionCanvas.height = window.innerHeight;
+  }
+
+  /** Gate the heavy speed-FX with the particle/quality setting (PerfGovernor). */
+  setFxEnabled(on: boolean): void {
+    this.fxEnabled = on;
+    if (!on) {
+      this.motionLines.length = 0;
+      this.motionCtx.clearRect(0, 0, this.motionCanvas.width, this.motionCanvas.height);
+      this.nitroFlash.style.opacity = '0';
+    }
   }
 
   private hintStrip!: HTMLDivElement;
@@ -303,6 +350,89 @@ export class HUD {
     this.buildMinimap(spline, halfWidth);
     this.lapTotal.textContent = `/${laps}`;
     this.posTotal.textContent = `/${fieldSize}`;
+    // reset per-race transient state
+    this.lastPos = 0;
+    this.lastLapCount = 0;
+    this.lastDriftFlare = false;
+    this.motionLines.length = 0;
+  }
+
+  // ----------------------------------------------------------- speed FX
+
+  private updateMotionFx(speedKmh: number): void {
+    const ctx = this.motionCtx;
+    const W = this.motionCanvas.width;
+    const H = this.motionCanvas.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!this.fxEnabled) return;
+
+    // colour by speed band
+    const color = speedKmh > 200 ? '#7a5cff' : speedKmh > 160 ? '#ff2bd6' : '#00f0ff';
+    const cx = W / 2;
+    const cy = H * 0.86; // emanate from near the speed pill
+
+    // emit new streaks above 140 km/h, rate scaling with speed
+    if (speedKmh > 140) {
+      this.motionEmitAccum += (speedKmh - 140) / 60;
+      while (this.motionEmitAccum >= 1 && this.motionLines.length < 40) {
+        this.motionEmitAccum -= 1;
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+        this.motionLines.push({ x: cx, y: cy, angle, len: 60 + Math.random() * 160, t: 0, life: 0.45, color });
+      }
+    }
+    // advance + draw
+    const dt = 1 / 60;
+    ctx.lineWidth = 2.5;
+    for (let i = this.motionLines.length - 1; i >= 0; i--) {
+      const ln = this.motionLines[i];
+      ln.t += dt;
+      if (ln.t >= ln.life) {
+        this.motionLines.splice(i, 1);
+        continue;
+      }
+      const prog = ln.t / ln.life;
+      const dist = prog * 380;
+      const ax = ln.x + Math.cos(ln.angle) * dist;
+      const ay = ln.y + Math.sin(ln.angle) * dist;
+      const bx = ln.x + Math.cos(ln.angle) * (dist + ln.len * (1 - prog));
+      const by = ln.y + Math.sin(ln.angle) * (dist + ln.len * (1 - prog));
+      ctx.globalAlpha = (1 - prog) * 0.5;
+      ctx.strokeStyle = ln.color;
+      ctx.beginPath();
+      ctx.moveTo(ax, ay);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // edge vignette at very high speed
+    if (speedKmh > 180) {
+      const v = clamp01((speedKmh - 180) / 60) * 0.5;
+      const grad = ctx.createRadialGradient(cx, H / 2, H * 0.25, cx, H / 2, H * 0.75);
+      grad.addColorStop(0, 'rgba(0,0,0,0)');
+      grad.addColorStop(1, `rgba(2,3,10,${v})`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, W, H);
+    }
+  }
+
+  private showDriftFlare(): void {
+    this.driftFlare.textContent = 'DRIFT BOOST';
+    this.driftFlare.classList.remove('hidden', 'play');
+    void this.driftFlare.offsetWidth;
+    this.driftFlare.classList.add('play');
+  }
+
+  private showLapDelta(lapMs: number, lapTimes: number[], isPB: boolean): void {
+    // delta vs previous best (the best BEFORE this lap)
+    const prevBest = lapTimes.length > 1 ? Math.min(...lapTimes.slice(0, -1)) : Infinity;
+    const delta = lapMs - prevBest;
+    const pop = el('div', {
+      class: 'lap-delta-popup ' + (isPB ? 'pb' : delta < 0 ? 'negative' : 'positive'),
+      html: isPB ? `✓ ${formatTime(lapMs)}` : `${formatDelta(delta)}`,
+    });
+    this.deltaPopups.append(pop);
+    setTimeout(() => pop.remove(), 900);
   }
 
   // ----------------------------------------------------------- per-frame
@@ -326,8 +456,27 @@ export class HUD {
       this.rpmArc.setAttribute('d', this.arcPath(50, 50, 33, SPEEDO_START, SPEEDO_START + SPEEDO_SWEEP * clamp01(p.rpm) + 0.01));
       this.gearVal.textContent = p.gear === 0 ? 'R' : String(p.gear);
       this.gearVal.style.color = p.gear === 0 ? 'var(--c-amber)' : 'var(--c-magenta)';
-      this.nitroFill.style.width = `${(p.nitro * 100).toFixed(0)}%`;
-      this.nitroFill.classList.toggle('active', p.nitroActive);
+
+      // segmented nitro gauge: fill L→R, segments past 80% go magenta, flare when active
+      const filled = Math.round(clamp01(p.nitro) * NITRO_SEGMENTS);
+      for (let i = 0; i < NITRO_SEGMENTS; i++) {
+        const on = i < filled;
+        const hot = i >= NITRO_SEGMENTS * 0.8;
+        const seg = this.nitroSegEls[i];
+        seg.className = 'nseg' + (on ? ' on' : '') + (on && hot ? ' hot' : '');
+      }
+      this.nitroGauge.classList.toggle('flaring', p.nitroActive);
+
+      // nitro screen flash (violet wash) eases in/out with activation
+      this.nitroFlash.style.opacity = this.fxEnabled && p.nitroActive ? '0.16' : '0';
+
+      // speed-reactive motion lines + edge vignette
+      this.updateMotionFx(p.speedKmh);
+
+      // drift-flare transient on drift + nitro combo
+      const driftCombo = p.drifting && p.nitroActive;
+      if (driftCombo && !this.lastDriftFlare) this.showDriftFlare();
+      this.lastDriftFlare = driftCombo;
     }
 
     // gesture chips
@@ -353,7 +502,17 @@ export class HUD {
 
     // position / lap / timing
     if (args.progress) {
-      this.posVal.textContent = String(args.progress.position);
+      const pos = args.progress.position;
+      this.posVal.textContent = String(pos);
+      // position pill: amber glow in P1, radar-ping flash when the position changes
+      this.posChip.classList.toggle('first-place', pos === 1);
+      if (this.lastPos && pos !== this.lastPos) {
+        this.posChip.classList.remove('ping');
+        void this.posChip.offsetWidth; // restart the one-shot animation
+        this.posChip.classList.add('ping');
+      }
+      this.lastPos = pos;
+
       this.lapVal.textContent = String(Math.min(args.progress.lap, +this.lapTotal.textContent.slice(1)));
       const lapElapsed = args.raceTimeMs - args.progress.lapStartMs;
       this.curTime.textContent = formatTime(lapElapsed);
@@ -364,6 +523,13 @@ export class HUD {
         this.deltaEl.className = 'delta ' + (delta >= 0 ? 'pos' : 'neg');
       } else {
         this.deltaEl.textContent = '';
+      }
+      // lap-completed delta popup (fires once when a lap is banked)
+      if (args.progress.lapTimes.length > this.lastLapCount) {
+        this.lastLapCount = args.progress.lapTimes.length;
+        const justRan = args.progress.lapTimes[args.progress.lapTimes.length - 1];
+        const isPB = justRan <= args.progress.bestLapMs;
+        this.showLapDelta(justRan, args.progress.lapTimes, isPB);
       }
       this.wrongWayEl.classList.toggle('hidden', !args.progress.wrongWay);
     }
@@ -413,10 +579,23 @@ export class HUD {
   // ----------------------------------------------------------- transient UI
 
   showCountdown(value: number | 'GO'): void {
-    const num = el('div', { class: 'num' + (value === 'GO' ? ' go' : ''), textContent: value === 'GO' ? 'GO!' : String(value) });
     this.countdownLayer.innerHTML = '';
+    const isGo = value === 'GO';
+    const num = el('div', { class: 'num' + (isGo ? ' go' : ''), textContent: isGo ? 'GO!' : String(value) });
+    if (isGo) {
+      // radial speed-line burst behind GO!
+      const burst = el('div', { class: 'countdown-burst' });
+      for (let i = 0; i < 14; i++) {
+        const line = el('div', { class: 'speed-line' });
+        line.style.transform = `rotate(${((i / 14) * 360).toFixed(0)}deg)`;
+        line.style.animationDelay = `${(i % 3) * 0.02}s`;
+        burst.append(line);
+      }
+      this.countdownLayer.append(burst);
+      setTimeout(() => burst.remove(), 900);
+    }
     this.countdownLayer.append(num);
-    setTimeout(() => num.remove(), 1000);
+    setTimeout(() => num.remove(), isGo ? 1200 : 1000);
   }
 
   toast(message: string, kind: '' | 'best' | 'warn' = ''): void {

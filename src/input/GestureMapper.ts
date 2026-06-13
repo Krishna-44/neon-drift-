@@ -39,6 +39,9 @@ export class GestureMapper {
   private customPauseFired: string | null = null;
   private lastUpdateT = -1;
 
+  /** Live introspection for the tuning overlay (raw vs. filtered signals). */
+  readonly debug = { steerRaw: 0, steerSmoothed: 0, throttle: 0, brake: 0, wheelAngleDeg: 0 };
+
   constructor(
     public settings: ControlSettings,
     public calibration: CalibrationData,
@@ -99,7 +102,11 @@ export class GestureMapper {
       const smoothed = this.steerFilter.filter(steerTarget, t);
       const maxDelta = STEER_SLEW_PER_S * dt;
       this.steer = clamp(smoothed, this.steer - maxDelta, this.steer + maxDelta);
+      this.debug.steerRaw = steerTarget;
+      this.debug.steerSmoothed = smoothed;
     } else {
+      this.debug.steerRaw = 0;
+      this.debug.steerSmoothed = this.steer;
       // Occlusion / hands-off coast-down: relax straight to centre, bypassing
       // the smoothing filter (feeding decay through it stretches the half-life).
       const halfLife = left || right ? ONE_HAND_DECAY_HALFLIFE : NO_HANDS_DECAY_HALFLIFE;
@@ -176,6 +183,9 @@ export class GestureMapper {
     out.throttle = clamp01(throttle);
     out.reverse = reverse;
     out.brake = clamp01(out.brake);
+    this.debug.throttle = out.throttle;
+    this.debug.brake = out.brake;
+    this.debug.wheelAngleDeg = out.gesture.wheelAngleDeg;
     return out;
   }
 

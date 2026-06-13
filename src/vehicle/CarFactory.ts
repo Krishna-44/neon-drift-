@@ -21,6 +21,20 @@ export interface CarHandles {
 
 export const CAR_COLORS = [0x00f0ff, 0xff2bd6, 0xffd166, 0x7a5cff, 0x3affd1, 0xff5e3a, 0xa0ff57, 0xff8ad8];
 
+/** Garage display names + cosmetic stat bars (0..100), keyed by CAR_COLORS index.
+ *  Stats are cosmetic flavour — all cars share the same physics for fair racing. */
+export const CAR_NAMES = ['Cyan Vector', 'Magenta Pulse', 'Amber Apex', 'Violet Surge', 'Mint Phantom', 'Ember GT', 'Lime Strike', 'Rose Nova'];
+export const CAR_STATS: ReadonlyArray<{ accel: number; handling: number; top: number }> = [
+  { accel: 82, handling: 74, top: 88 },
+  { accel: 88, handling: 70, top: 84 },
+  { accel: 76, handling: 86, top: 80 },
+  { accel: 80, handling: 80, top: 86 },
+  { accel: 84, handling: 82, top: 78 },
+  { accel: 90, handling: 66, top: 90 },
+  { accel: 78, handling: 90, top: 76 },
+  { accel: 86, handling: 76, top: 82 },
+];
+
 export function buildCar(accent: number, isPlayer: boolean): CarHandles {
   const group = new THREE.Group();
   const body = new THREE.Group();

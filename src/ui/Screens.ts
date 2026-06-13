@@ -17,17 +17,48 @@ export interface MenuCallbacks {
   onTrain(): void;
   onSettings(): void;
   onHelp(): void;
+  onCarPrev(): void;
+  onCarNext(): void;
 }
 
 export class MainMenu {
   readonly root: HTMLDivElement;
   private cvDot: HTMLSpanElement;
   private cvText: HTMLSpanElement;
+  private badge!: HTMLDivElement;
+  private carName: HTMLElement;
+  private statFills: Record<string, HTMLElement> = {};
 
   constructor(cb: MenuCallbacks) {
     this.cvDot = el('span', { class: 'cv-dot' });
     this.cvText = el('span', { textContent: 'Camera: idle' });
-    const badge = el('div', { class: 'cv-badge' }, [this.cvDot, this.cvText]);
+    this.badge = el('div', { class: 'cv-badge clickable', title: 'Camera setup' }, [this.cvDot, this.cvText]);
+    this.badge.setAttribute('data-gesture-click', '');
+    const badge = this.badge;
+
+    // garage carousel strip (bottom-right, over the live 3D showroom)
+    this.carName = el('div', { class: 'garage-name', textContent: '—' });
+    const prev = el('button', { class: 'garage-arrow', textContent: '‹', title: 'Previous car' });
+    const next = el('button', { class: 'garage-arrow', textContent: '›', title: 'Next car' });
+    prev.setAttribute('data-gesture-click', '');
+    next.setAttribute('data-gesture-click', '');
+    prev.addEventListener('click', cb.onCarPrev);
+    next.addEventListener('click', cb.onCarNext);
+    const mkStat = (key: string, label: string) => {
+      const fill = el('i');
+      this.statFills[key] = fill;
+      return el('div', { class: 'garage-stat' }, [
+        el('span', { class: 'gs-label', textContent: label }),
+        el('div', { class: `gs-bar ${key}` }, [fill]),
+      ]);
+    };
+    const garage = el('div', { class: 'garage-strip' }, [
+      el('div', { class: 'garage-head', textContent: 'GARAGE' }),
+      el('div', { class: 'garage-select' }, [prev, this.carName, next]),
+      mkStat('accel', 'ACCEL'),
+      mkStat('handling', 'GRIP'),
+      mkStat('top', 'TOP'),
+    ]);
 
     const mkBtn = (label: string, fn: () => void, primary = false) => {
       const b = el('button', { class: `neon${primary ? ' primary' : ''}`, textContent: label });
@@ -48,6 +79,7 @@ export class MainMenu {
       el('h1', { class: 'title', html: 'NEON<span class="glitch">DRIFT</span> <span style="color:var(--c-magenta)">GP</span>' }),
       el('p', { class: 'subtitle', textContent: 'Gesture-Controlled Racing Simulator' }),
       buttons,
+      garage,
       el('div', { class: 'menu-foot', html: 'Drive with your hands · No controller required · ESC to pause in race' }),
     ]);
   }
@@ -55,6 +87,19 @@ export class MainMenu {
   setCameraStatus(state: 'idle' | 'ok' | 'warn' | 'error', text: string): void {
     this.cvDot.className = 'cv-dot' + (state === 'ok' ? ' ok' : state === 'warn' ? ' warn' : '');
     this.cvText.textContent = text;
+  }
+
+  onBadgeClick(fn: () => void): void {
+    this.badge.addEventListener('click', fn);
+  }
+
+  /** Update the garage strip when the carousel car changes. */
+  setCarInfo(name: string, color: number, stats: { accel: number; handling: number; top: number }): void {
+    this.carName.textContent = name;
+    this.carName.style.color = '#' + color.toString(16).padStart(6, '0');
+    this.statFills.accel.style.width = `${stats.accel}%`;
+    this.statFills.handling.style.width = `${stats.handling}%`;
+    this.statFills.top.style.width = `${stats.top}%`;
   }
 
   setVisible(v: boolean): void {

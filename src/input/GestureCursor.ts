@@ -56,6 +56,7 @@ export class GestureCursor {
     const target = document.elementFromPoint(x, y);
     const clickable = target?.closest('button, [data-gesture-click]') ?? null;
     this.setHover(clickable);
+    this.el.classList.toggle('hovering', !!clickable);
 
     const pinch = hand.features.pinching;
     this.el.classList.toggle('pinching', pinch);

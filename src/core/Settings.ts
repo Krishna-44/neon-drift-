@@ -84,6 +84,8 @@ export interface GameSettings {
   cvProcessScale: number; // 1 | 0.75 | 0.5 — auto-managed, persisted
   /** First-run "how to play" overlay has been acknowledged. */
   seenOnboarding: boolean;
+  /** Player car accent colour chosen in the garage carousel. */
+  playerCarColor: number;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -117,6 +119,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   laps: 3,
   cvProcessScale: 1,
   seenOnboarding: false,
+  playerCarColor: 0x00f0ff,
 };
 
 const STORAGE_KEY = 'neondrift-gp.settings.v1';

@@ -192,7 +192,8 @@ export class GameSession {
       });
       dyn.teleport(px, pz, Math.atan2(tan.x, tan.z));
 
-      const color = isPlayer ? 0x00f0ff : CAR_COLORS[(i + 2) % CAR_COLORS.length];
+      let color = isPlayer ? this.settings.playerCarColor : CAR_COLORS[(i + 2) % CAR_COLORS.length];
+      if (!isPlayer && color === this.settings.playerCarColor) color = CAR_COLORS[(i + 3) % CAR_COLORS.length];
       const handles = buildCar(color, isPlayer);
       this.scene.add(handles.group);
       const visual = new CarVisual(handles);
@@ -246,6 +247,7 @@ export class GameSession {
         this.events.emit('countdown', { value: 'GO' });
         this.events.emit('raceStart', {});
         this.audio.countdownBeep(true);
+        this.camera.triggerLaunch(); // standing-start FOV punch + shake
       }
     }
 
@@ -488,12 +490,45 @@ export class GameSession {
     return this.director?.raceTimeMs ?? 0;
   }
 
-  // ------------------------------------------------------- menu showroom
+  // ------------------------------------------------------- menu garage
 
-  private showroom: { group: THREE.Group; car: ReturnType<typeof buildCar>; disposables: Array<{ dispose(): void }> } | null = null;
+  private showroom: {
+    group: THREE.Group;
+    carHolder: THREE.Group;
+    car: ReturnType<typeof buildCar>;
+    ringMat: THREE.MeshBasicMaterial;
+    ring2Mat: THREE.MeshBasicMaterial;
+    keyLight: THREE.PointLight;
+    disposables: Array<{ dispose(): void }>;
+  } | null = null;
   private showroomAngle = 0;
+  private carColorIndex = 0;
+  /** Spin animation progress when swapping cars (radians of extra spin remaining). */
+  private swapSpin = 0;
+  private swapPending: number | null = null;
+  private targetRing = new THREE.Color(0x00f0ff);
+
+  /** Cycle the garage car. dir = +1 next, -1 prev. Persists the choice. */
+  cycleShowroomCar(dir: number): number {
+    const n = CAR_COLORS.length;
+    this.carColorIndex = (this.carColorIndex + dir + n) % n;
+    this.swapPending = CAR_COLORS[this.carColorIndex];
+    this.swapSpin = Math.PI; // half-turn spin while the new car swaps in
+    return CAR_COLORS[this.carColorIndex];
+  }
+
+  get showroomColor(): number {
+    return CAR_COLORS[this.carColorIndex];
+  }
+
+  private syncCarColorIndex(): void {
+    const want = this.settings.playerCarColor;
+    const idx = CAR_COLORS.indexOf(want);
+    this.carColorIndex = idx >= 0 ? idx : 0;
+  }
 
   private buildShowroom(): void {
+    this.syncCarColorIndex();
     const group = new THREE.Group();
     const disposables: Array<{ dispose(): void }> = [];
     const keep = <T extends { dispose(): void }>(o: T): T => {
@@ -526,37 +561,38 @@ export class GameSession {
     floor.rotation.x = -Math.PI / 2;
     group.add(floor);
 
-    // glowing podium ring under the car
-    const ring = new THREE.Mesh(
-      keep(new THREE.TorusGeometry(3.6, 0.07, 10, 64)),
-      keep(new THREE.MeshBasicMaterial({ color: 0x00f0ff })),
-    );
+    const accent = CAR_COLORS[this.carColorIndex];
+
+    // glowing podium rings under the car (inner lerps to the selected car colour)
+    const ringMat = keep(new THREE.MeshBasicMaterial({ color: accent }));
+    const ring = new THREE.Mesh(keep(new THREE.TorusGeometry(3.6, 0.07, 10, 64)), ringMat);
     ring.rotation.x = Math.PI / 2;
     ring.position.y = 0.04;
     group.add(ring);
-    const ring2 = new THREE.Mesh(
-      keep(new THREE.TorusGeometry(4.3, 0.04, 8, 64)),
-      keep(new THREE.MeshBasicMaterial({ color: 0xff2bd6 })),
-    );
+    const ring2Mat = keep(new THREE.MeshBasicMaterial({ color: 0xff2bd6 }));
+    const ring2 = new THREE.Mesh(keep(new THREE.TorusGeometry(4.3, 0.04, 8, 64)), ring2Mat);
     ring2.rotation.x = Math.PI / 2;
     ring2.position.y = 0.04;
     group.add(ring2);
 
-    // showcase car
-    const car = buildCar(0x00f0ff, false);
-    group.add(car.group);
+    // showcase car on a turntable holder (so we can spin it on swap)
+    const carHolder = new THREE.Group();
+    const car = buildCar(accent, false);
+    carHolder.add(car.group);
+    group.add(carHolder);
 
     // dramatic two-tone lighting (tracked via keep() so disposeShowroom frees them)
     const hemi = keep(new THREE.HemisphereLight(0x3a5a8a, 0x0a0a14, 0.8));
-    const key = keep(new THREE.PointLight(0x00f0ff, 220, 60, 1.8));
-    key.position.set(6, 7, 6);
+    const keyLight = keep(new THREE.PointLight(accent, 220, 60, 1.8));
+    keyLight.position.set(6, 7, 6);
     const fill = keep(new THREE.PointLight(0xff2bd6, 160, 60, 1.8));
     fill.position.set(-7, 5, -5);
-    group.add(hemi, key, fill);
+    group.add(hemi, keyLight, fill);
 
     this.scene.fog = new THREE.FogExp2(0x04060d, 0.018);
     this.scene.add(group);
-    this.showroom = { group, car, disposables };
+    this.targetRing.set(accent);
+    this.showroom = { group, carHolder, car, ringMat, ring2Mat, keyLight, disposables };
   }
 
   private disposeShowroom(): void {
@@ -568,23 +604,47 @@ export class GameSession {
     this.showroom = null;
   }
 
-  /** Live 3D showroom backdrop while in menus (slow orbit around a showcase car). */
+  /** Live 3D garage backdrop while in menus: orbiting hero car on a podium that
+   *  swaps colour with a spin when the player flicks through the carousel. */
   renderMenuBackdrop(frameDt = 1 / 60): void {
     if (this.builtTrack) this.teardownRace(); // back at the menu: free the race world
     if (!this.showroom) this.buildShowroom();
+    const sr = this.showroom!;
+
+    // mid-spin car swap: when the holder is "edge-on" (~90°), replace the model.
+    if (this.swapSpin > 0) {
+      this.swapSpin = Math.max(0, this.swapSpin - frameDt * 7);
+      if (this.swapPending !== null && this.swapSpin <= Math.PI / 2) {
+        const accent = this.swapPending;
+        this.swapPending = null;
+        sr.car.dispose();
+        sr.carHolder.remove(sr.car.group);
+        sr.car = buildCar(accent, false);
+        sr.carHolder.add(sr.car.group);
+        this.targetRing.set(accent);
+        // settings.playerCarColor is persisted by the App on cycle; mutate the
+        // shared data object here so loadRace() picks up the latest choice too.
+        this.settings.playerCarColor = accent;
+      }
+    }
+    sr.carHolder.rotation.y = this.showroomAngle + (this.swapSpin > 0 ? this.swapSpin : 0);
+
+    // ring + key-light colour ease toward the selected car
+    sr.ringMat.color.lerp(this.targetRing, 1 - Math.pow(0.5, frameDt / 0.12));
+    sr.keyLight.color.lerp(this.targetRing, 1 - Math.pow(0.5, frameDt / 0.2));
+
     this.showroomAngle += frameDt * 0.22;
     const r = 8.2;
     const cam = this.camera.camera;
-    cam.position.set(Math.sin(this.showroomAngle) * r, 2.4 + Math.sin(this.showroomAngle * 0.6) * 0.5, Math.cos(this.showroomAngle) * r);
+    cam.position.set(Math.sin(this.showroomAngle * 0.5) * r, 2.4 + Math.sin(this.showroomAngle * 0.4) * 0.45, Math.cos(this.showroomAngle * 0.5) * r);
     cam.lookAt(0, 0.7, 0);
     if (Math.abs(cam.fov - 50) > 0.01) {
       cam.fov = 50;
       cam.updateProjectionMatrix();
     }
     // gentle idle motion: wheels roll, underglow pulses
-    const car = this.showroom!.car;
-    for (const w of car.wheels) w.rotation.x += frameDt * 1.4;
-    car.underglow.opacity = 0.3 + Math.sin(this.showroomAngle * 4) * 0.12;
+    for (const w of sr.car.wheels) w.rotation.x += frameDt * 1.4;
+    sr.car.underglow.opacity = 0.3 + Math.sin(this.showroomAngle * 4) * 0.12;
     this.postfx.render(this.scene, cam);
   }
 

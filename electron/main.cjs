@@ -18,6 +18,17 @@ const DIST = path.join(__dirname, '..', 'dist');
 const SMOKE = process.argv.includes('--smoke');
 const DEV = process.argv.includes('--dev');
 
+// Headless / CI hardening: the renderer sandbox frequently fails to spin up in
+// containerised or restricted Windows environments (surfaces as ERR_FAILED on
+// navigation), and modern Chromium gates SwiftShader WebGL behind an explicit
+// flag when there is no hardware GPU. These make the smoke test reliable; on a
+// normal desktop they are smoke-only so real GPU rendering is unaffected.
+if (SMOKE) {
+  app.commandLine.appendSwitch('no-sandbox');
+  app.commandLine.appendSwitch('enable-unsafe-swiftshader'); // allow software WebGL
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+}
+
 const MIME = {
   '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript',
   '.css': 'text/css', '.json': 'application/json', '.wasm': 'application/wasm',
@@ -91,12 +102,36 @@ async function createWindow() {
   });
 
   const query = SMOKE ? '?smoke=1' : '';
-  await win.loadURL(`http://127.0.0.1:${port}/${query}`);
+  const url = `http://127.0.0.1:${port}/${query}`;
+  // The freshly-listened socket can briefly refuse connections on Windows, and
+  // Electron's net service surfaces that as a fatal ERR_FAILED. Retry with
+  // backoff so a transient first-connect miss doesn't abort the launch.
+  const ok = await loadWithRetry(win, url, SMOKE ? 6 : 4);
+  if (!ok) {
+    console.error('[electron] failed to load ' + url + ' after retries');
+    if (SMOKE) {
+      app.exit(1);
+      return;
+    }
+  }
   if (DEV) win.webContents.openDevTools({ mode: 'detach' });
 
   if (SMOKE) {
     runSmoke(win);
   }
+}
+
+async function loadWithRetry(win, url, attempts) {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      await win.loadURL(url);
+      return true;
+    } catch (err) {
+      console.error(`[electron] load attempt ${i + 1}/${attempts} failed: ${err && err.message ? err.message : err}`);
+      await new Promise((r) => setTimeout(r, 300 + i * 300));
+    }
+  }
+  return false;
 }
 
 async function runSmoke(win) {
@@ -129,10 +164,14 @@ async function runSmoke(win) {
   poll();
 }
 
-// Disable GPU-blocklist so software GL works in headless CI for the smoke test.
-if (SMOKE) app.disableHardwareAcceleration();
-
-app.whenReady().then(createWindow);
+app.whenReady().then(createWindow).catch((err) => {
+  console.error('[electron] fatal:', err);
+  app.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[electron] unhandled rejection:', err);
+  if (SMOKE) app.exit(1);
+});
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });

@@ -20,6 +20,8 @@ export class CameraRig {
   private shake = 0;
   private tripods: THREE.Vector3[] = [];
   private activeTripod = 0;
+  /** Race-start launch push: counts 0→1 over ~0.7s, drives an FOV punch + pull-back. */
+  private launchT = -1;
 
   constructor(aspect: number) {
     this.camera = new THREE.PerspectiveCamera(BASE_FOV, aspect, 0.3, 2600);
@@ -46,6 +48,12 @@ export class CameraRig {
 
   addImpact(intensity: number): void {
     this.shake = Math.min(this.shake + intensity * 0.25, 1.4);
+  }
+
+  /** Fire the cinematic launch (called on GO): a sharp shake + FOV punch that eases out. */
+  triggerLaunch(): void {
+    this.launchT = 0;
+    this.addImpact(1.1);
   }
 
   snapBehind(state: VehicleState, groundY: number): void {
@@ -101,9 +109,19 @@ export class CameraRig {
       }
     }
 
-    // FOV: speed widening + nitro punch.
-    const targetFov = BASE_FOV + speed01 * 13 + (state.nitroActive ? 8 : 0);
-    this.fov = damp(this.fov, targetFov, 0.12, frameDt);
+    // FOV: speed widening + nitro punch + launch punch.
+    let targetFov = BASE_FOV + speed01 * 13 + (state.nitroActive ? 8 : 0);
+    if (this.launchT >= 0) {
+      // half-sine punch: FOV flares wide then snaps back over ~0.7s, and the
+      // camera lifts/pulls back a touch — an Asphalt-style standing-start kick.
+      const k = Math.sin(Math.min(this.launchT / 0.7, 1) * Math.PI);
+      targetFov += k * 16;
+      this.pos.y += k * 0.6;
+      this.launchT += frameDt;
+      if (this.launchT > 0.7) this.launchT = -1;
+    }
+    // Snap toward the launch flare fast, ease back smoothly.
+    this.fov = damp(this.fov, targetFov, this.launchT >= 0 ? 0.04 : 0.12, frameDt);
 
     // impact shake decay
     this.shake = Math.max(0, this.shake - frameDt * 2.6);

@@ -66,6 +66,31 @@ export class CameraManager {
     return this.lowLight;
   }
 
+  /** Best-effort current camera permission state (Permissions API where available). */
+  async getPermissionState(): Promise<'granted' | 'denied' | 'prompt' | 'unknown'> {
+    if (!navigator.mediaDevices?.getUserMedia) return 'unknown';
+    try {
+      const perms = (navigator as any).permissions;
+      if (perms?.query) {
+        const status = await perms.query({ name: 'camera' as PermissionName });
+        return status.state as 'granted' | 'denied' | 'prompt';
+      }
+    } catch {
+      /* Firefox/Safari may not support the 'camera' descriptor */
+    }
+    return 'unknown';
+  }
+
+  /** True if at least one video input device is present (labels need permission). */
+  async hasCamera(): Promise<boolean> {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.some((d) => d.kind === 'videoinput');
+    } catch {
+      return false;
+    }
+  }
+
   async listDevices(): Promise<{ id: string; label: string }[]> {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();

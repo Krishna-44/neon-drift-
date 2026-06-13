@@ -441,3 +441,178 @@ button.neon:disabled { opacity: 0.4; cursor: not-allowed; }
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(0,240,255,0.3); border-radius: 4px; }
+
+/* ===================================================================
+   ASPHALT-GRADE DASHBOARD UPGRADE (garage carousel, race HUD FX, juice)
+   =================================================================== */
+
+/* ---- Garage carousel strip (main menu, over the live 3D showroom) ---- */
+.garage-strip {
+  position: absolute; right: 34px; bottom: 30px; width: 250px;
+  background: var(--glass); border: 1px solid var(--glass-line); border-radius: 14px;
+  backdrop-filter: blur(12px); padding: 14px 16px; pointer-events: auto;
+  box-shadow: 0 8px 36px rgba(0,0,0,0.55);
+  animation: fade 0.4s ease-out;
+}
+.garage-head { font-size: 11px; letter-spacing: 0.3em; color: var(--text-dim); margin-bottom: 8px; }
+.garage-select { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.garage-arrow {
+  pointer-events: auto; cursor: pointer; width: 34px; height: 34px; border-radius: 9px;
+  background: rgba(0,240,255,0.08); border: 1px solid var(--glass-line); color: var(--c-cyan);
+  font-size: 22px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  transition: transform 0.1s, background 0.15s, box-shadow 0.15s;
+}
+.garage-arrow:hover, .garage-arrow.gesture-hover { background: rgba(0,240,255,0.2); box-shadow: 0 0 16px rgba(0,240,255,0.35); transform: scale(1.08); }
+.garage-arrow:active { transform: scale(0.94); }
+.garage-name { font-size: 16px; font-weight: 800; letter-spacing: 0.04em; text-align: center; flex: 1; text-shadow: 0 0 12px currentColor; transition: color 0.3s; }
+.garage-stat { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.gs-label { flex: 0 0 48px; font-size: 9px; letter-spacing: 0.14em; color: var(--text-dim); }
+.gs-bar { flex: 1; height: 5px; border-radius: 3px; background: rgba(2,3,10,0.6); overflow: hidden; }
+.gs-bar i { display: block; height: 100%; width: 0; transition: width 0.35s cubic-bezier(0.34,1.56,0.64,1); border-radius: 3px; }
+.gs-bar.accel i { background: linear-gradient(90deg, #0a7, var(--c-cyan)); }
+.gs-bar.handling i { background: linear-gradient(90deg, #a18, var(--c-magenta)); }
+.gs-bar.top i { background: linear-gradient(90deg, #093, var(--c-green)); }
+
+/* ---- Segmented nitro gauge ---- */
+.nitro-segs { display: flex; gap: 3px; height: 14px; }
+.nseg {
+  flex: 1; border-radius: 3px; background: rgba(0,240,255,0.12);
+  border: 1px solid rgba(0,240,255,0.18); transition: background 0.1s, box-shadow 0.15s;
+  will-change: box-shadow, transform;
+}
+.nseg.on { background: var(--c-cyan); border-color: var(--c-cyan); box-shadow: 0 0 8px rgba(0,240,255,0.6); }
+.nseg.on.hot { background: var(--c-magenta); border-color: var(--c-magenta); box-shadow: 0 0 8px rgba(255,43,214,0.7); }
+.nitro-segs.flaring .nseg.on { animation: nseg-flare 0.25s linear infinite; }
+@keyframes nseg-flare {
+  0%,100% { box-shadow: 0 0 8px rgba(122,92,255,0.6); transform: scaleY(1); }
+  50% { box-shadow: 0 0 20px rgba(122,92,255,1); transform: scaleY(1.25); }
+}
+
+/* ---- Speed-reactive motion-line canvas + nitro screen flash ---- */
+.motion-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.nitro-flash {
+  position: absolute; inset: 0; pointer-events: none; z-index: 2; opacity: 0;
+  transition: opacity 0.15s ease-out;
+  background: radial-gradient(ellipse at 50% 86%, rgba(122,92,255,0.5), transparent 62%);
+}
+
+/* ---- Position pill: pulse, pass-ping, first-place amber ---- */
+.info-chip.pos { animation: pos-pulse 1.6s ease-in-out infinite; }
+@keyframes pos-pulse {
+  0%,100% { box-shadow: 0 0 0 1px var(--glass-line), 0 0 14px rgba(0,240,255,0.25); }
+  50% { box-shadow: 0 0 0 1px var(--glass-line), 0 0 24px rgba(0,240,255,0.5); }
+}
+.info-chip.pos.first-place { border-color: rgba(255,182,72,0.6); animation: pos-pulse-amber 1.2s ease-in-out infinite; }
+.info-chip.pos.first-place .ic-big { color: var(--c-amber); }
+@keyframes pos-pulse-amber {
+  0%,100% { box-shadow: 0 0 0 1px rgba(255,182,72,0.4), 0 0 18px rgba(255,182,72,0.3); }
+  50% { box-shadow: 0 0 0 1px rgba(255,182,72,0.6), 0 0 32px rgba(255,182,72,0.6); }
+}
+.info-chip.pos.ping { animation: pos-ping 0.45s ease-out; }
+@keyframes pos-ping {
+  0% { box-shadow: 0 0 0 1px #fff, 0 0 30px rgba(0,240,255,1); transform: scale(1.08); }
+  100% { box-shadow: 0 0 0 1px var(--glass-line), 0 0 10px rgba(0,240,255,0.3); transform: scale(1); }
+}
+
+/* ---- Lap-delta popup ---- */
+.delta-popups { position: absolute; left: 50%; top: 64px; transform: translateX(-50%); pointer-events: none; }
+.lap-delta-popup {
+  position: absolute; left: 50%; top: 0; transform: translateX(-50%);
+  font-family: var(--mono); font-weight: 800; font-size: 34px; white-space: nowrap;
+  animation: delta-pop 0.9s ease-out forwards;
+}
+.lap-delta-popup.negative { color: var(--c-green); text-shadow: 0 0 18px rgba(58,255,209,0.7); }
+.lap-delta-popup.positive { color: var(--c-red); text-shadow: 0 0 18px rgba(255,59,92,0.6); }
+.lap-delta-popup.pb { color: #ffe27a; text-shadow: 0 0 24px rgba(255,210,80,0.9); font-size: 30px; }
+@keyframes delta-pop {
+  0% { transform: translateX(-50%) scale(0.6); opacity: 0; }
+  25% { transform: translateX(-50%) scale(1.1); opacity: 1; }
+  40% { transform: translateX(-50%) scale(1); opacity: 1; }
+  100% { transform: translateX(-50%) scale(0.85) translateY(-64px); opacity: 0; }
+}
+
+/* ---- Drift-boost flare ---- */
+.drift-flare {
+  position: absolute; left: 50%; top: 46%; transform: translate(-50%,-50%);
+  font-weight: 900; letter-spacing: 0.2em; color: var(--c-amber);
+  text-shadow: 0 0 28px var(--c-amber); pointer-events: none;
+}
+.drift-flare.play { animation: drift-scale 0.8s ease-out forwards; }
+@keyframes drift-scale {
+  0% { opacity: 0; font-size: 26px; }
+  35% { opacity: 1; font-size: 50px; }
+  100% { opacity: 0; font-size: 56px; }
+}
+
+/* ---- Countdown speed-line burst + richer pop ---- */
+.countdown .num { animation: count-pop 1s cubic-bezier(0.6,0,0.4,1); }
+@keyframes count-pop {
+  0% { transform: scale(2.4) rotateX(20deg); opacity: 0; filter: blur(8px); }
+  35% { transform: scale(1.05); opacity: 1; filter: blur(0); }
+  70% { transform: scale(0.95); opacity: 1; }
+  100% { transform: scale(0.7) rotateX(-18deg); opacity: 0; filter: blur(4px); }
+}
+.countdown .num.go { font-size: 240px; animation: count-pop 1.2s cubic-bezier(0.4,0,0.2,1); }
+.countdown-burst { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.speed-line {
+  position: absolute; width: 240px; height: 4px; transform-origin: left center;
+  background: linear-gradient(90deg, var(--c-cyan), transparent);
+  animation: go-burst 0.85s cubic-bezier(0.25,0.46,0.45,0.94) forwards;
+}
+@keyframes go-burst {
+  0% { opacity: 0.7; transform: translateX(0) scaleX(0.3); }
+  100% { opacity: 0; transform: translateX(520px) scaleX(1); }
+}
+
+/* ---- Track-card 3D hover tilt ---- */
+.track-grid { perspective: 1000px; }
+.track-card:hover, .track-card.gesture-hover { transform: translateY(-8px) rotateX(-5deg) rotateY(-3deg); }
+
+/* ---- Button press juice + gesture-cursor hover pulse ---- */
+button.neon:active { transform: translateX(4px) scale(0.95); box-shadow: inset 0 0 20px rgba(0,240,255,0.25), 0 0 16px rgba(0,240,255,0.2); }
+.gesture-cursor.hovering { animation: cursor-pulse 0.5s ease-in-out infinite; }
+@keyframes cursor-pulse {
+  0%,100% { box-shadow: 0 0 16px var(--c-cyan), inset 0 0 8px rgba(0,240,255,0.4); }
+  50% { box-shadow: 0 0 32px var(--c-cyan), inset 0 0 10px rgba(0,240,255,0.7); }
+}
+
+/* ---- Menu button cascade + screen-card entrance ---- */
+#menu-root:not(.hidden) button.neon { animation: btn-cascade 0.45s cubic-bezier(0.34,1.56,0.64,1) backwards; }
+.menu-buttons button:nth-child(1) { animation-delay: 0.05s; }
+.menu-buttons button:nth-child(2) { animation-delay: 0.11s; }
+.menu-buttons button:nth-child(3) { animation-delay: 0.17s; }
+.menu-buttons button:nth-child(4) { animation-delay: 0.23s; }
+.menu-buttons button:nth-child(5) { animation-delay: 0.29s; }
+@keyframes btn-cascade { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: translateX(0); } }
+.screen:not(.hidden) .screen-card { animation: card-enter 0.4s cubic-bezier(0.34,1.56,0.64,1) backwards; }
+@keyframes card-enter { from { opacity: 0; transform: translateY(26px) scale(0.98); } to { opacity: 1; transform: none; } }
+
+/* ---- Results rows sweep-in ---- */
+.results-table tbody tr { animation: row-sweep 0.5s cubic-bezier(0.34,1.56,0.64,1) backwards; }
+.results-table tbody tr:nth-child(1) { animation-delay: 0.05s; }
+.results-table tbody tr:nth-child(2) { animation-delay: 0.10s; }
+.results-table tbody tr:nth-child(3) { animation-delay: 0.15s; }
+.results-table tbody tr:nth-child(4) { animation-delay: 0.20s; }
+.results-table tbody tr:nth-child(5) { animation-delay: 0.25s; }
+.results-table tbody tr:nth-child(6) { animation-delay: 0.30s; }
+.results-table tbody tr:nth-child(7) { animation-delay: 0.35s; }
+.results-table tbody tr:nth-child(8) { animation-delay: 0.40s; }
+@keyframes row-sweep { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+
+/* ---- Camera permission / setup overlay ---- */
+.cv-badge.clickable { cursor: pointer; transition: color 0.15s, transform 0.12s; }
+.cv-badge.clickable:hover, .cv-badge.clickable.gesture-hover { color: var(--c-cyan); transform: scale(1.04); }
+
+.cam-prompt .cam-card { max-width: 520px; text-align: center; }
+.cam-icon { font-size: 46px; margin-bottom: 6px; filter: drop-shadow(0 0 18px rgba(0,240,255,0.6)); }
+.cam-body { margin: 8px 0 4px; }
+.cam-points { text-align: left; list-style: none; padding: 0; margin: 14px auto; max-width: 420px; display: flex; flex-direction: column; gap: 10px; }
+.cam-points li { font-size: 14px; color: var(--text); background: rgba(0,240,255,0.05); border: 1px solid rgba(0,240,255,0.12); border-radius: 10px; padding: 10px 14px; }
+ol.cam-points { counter-reset: step; }
+.cam-warn { color: var(--c-amber); font-weight: 700; }
+.cam-ok { color: var(--c-green); font-weight: 700; text-shadow: 0 0 12px rgba(58,255,209,0.5); }
+.cam-actions { margin-top: 22px; }
+.cam-device-row { display: flex; align-items: center; gap: 12px; justify-content: center; margin-top: 14px; }
+.cam-device-row label { font-size: 12px; letter-spacing: 0.12em; color: var(--text-dim); text-transform: uppercase; }
+.cam-device { background: rgba(4,6,13,0.8); color: var(--text); border: 1px solid var(--glass-line); border-radius: 8px; padding: 8px 10px; font-family: var(--font); min-width: 200px; }
+.cam-spinner { width: 46px; height: 46px; margin: 10px auto 4px; border: 3px solid rgba(0,240,255,0.15); border-top-color: var(--c-cyan); border-radius: 50%; animation: spin 0.9s linear infinite; }
