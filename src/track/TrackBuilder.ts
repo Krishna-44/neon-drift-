@@ -232,10 +232,13 @@ export function buildTrack(spline: TrackSpline, def: TrackDef, quality: 'low' | 
       new THREE.MeshStandardMaterial({
         map: track(maps.map),
         bumpMap: track(maps.bump),
-        bumpScale: 0.6,
+        bumpScale: 0.5,
+        // Roughness map drives a wet, uneven sheen — puddle-like neon reflections
+        // where the asphalt is polished, matte where it's coarse.
         roughnessMap: maps.bump,
-        roughness: 0.95,
-        metalness: 0.08,
+        roughness: 0.62,
+        metalness: 0.5,
+        envMapIntensity: 0.9,
       }),
     ) as THREE.MeshStandardMaterial;
     group.add(new THREE.Mesh(geo, mat));

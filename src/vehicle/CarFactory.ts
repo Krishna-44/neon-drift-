@@ -45,21 +45,25 @@ export function buildCar(accent: number, isPlayer: boolean): CarHandles {
     return o;
   };
 
-  // Lighter metallic paint tinted toward the car's accent, with a low emissive
-  // so the body always reads even on the dark night tracks (was near-black).
+  // Clearcoat car paint: an accent-tinted metallic base under a glossy clear
+  // layer that catches the neon HDR environment — showroom-grade reflections.
+  // A low emissive keeps the body readable on the dark night tracks.
   const accentCol = new THREE.Color(accent);
-  const paintCol = accentCol.clone().multiplyScalar(0.28).addScalar(0.06);
+  const paintCol = accentCol.clone().multiplyScalar(0.32).addScalar(0.05);
   const paint = keep(
-    new THREE.MeshStandardMaterial({
+    new THREE.MeshPhysicalMaterial({
       color: paintCol,
-      metalness: 0.6,
-      roughness: 0.38,
+      metalness: 0.85,
+      roughness: 0.34,
+      clearcoat: 1,
+      clearcoatRoughness: 0.12,
+      envMapIntensity: 1.4,
       emissive: accentCol.clone().multiplyScalar(0.5),
-      emissiveIntensity: 0.22,
+      emissiveIntensity: 0.18,
     }),
   );
   const accentMat = keep(new THREE.MeshBasicMaterial({ color: accent }));
-  const glass = keep(new THREE.MeshStandardMaterial({ color: 0x05060a, metalness: 0.9, roughness: 0.12 }));
+  const glass = keep(new THREE.MeshStandardMaterial({ color: 0x05060a, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.6 }));
   const tire = keep(new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.95 }));
 
   // hull

@@ -43,14 +43,27 @@ const COMPOSITE_FS = /* glsl */ `
   uniform sampler2D tBase;
   uniform sampler2D tBloom;
   uniform float intensity;
+  uniform float time;
+  uniform float aberration; // chromatic-aberration strength at the edges
   varying vec2 vUv;
   void main() {
-    vec4 base = texture2D(tBase, vUv);
-    vec4 bloom = texture2D(tBloom, vUv);
-    // subtle vignette for the cyberpunk look
     vec2 d = vUv - 0.5;
-    float vig = smoothstep(0.85, 0.35, dot(d, d) * 2.2);
-    vec3 col = (base.rgb + bloom.rgb * intensity) * mix(0.82, 1.0, vig);
+    float r2 = dot(d, d);
+    // Chromatic aberration: split the channels radially, stronger toward edges.
+    vec2 ca = d * r2 * aberration;
+    vec3 base = vec3(
+      texture2D(tBase, vUv + ca).r,
+      texture2D(tBase, vUv).g,
+      texture2D(tBase, vUv - ca).b
+    );
+    vec3 bloom = texture2D(tBloom, vUv).rgb;
+    vec3 col = base + bloom * intensity;
+    // Cyberpunk vignette.
+    float vig = smoothstep(0.95, 0.30, r2 * 2.2);
+    col *= mix(0.78, 1.0, vig);
+    // Subtle animated film grain.
+    float grain = fract(sin(dot(vUv * vec2(time * 0.7 + 12.9898, 78.233), vec2(1.0))) * 43758.5453);
+    col += (grain - 0.5) * 0.035;
     gl_FragColor = vec4(col, 1.0);
   }
 `;
@@ -62,8 +75,10 @@ const VERT = /* glsl */ `
 
 export class PostFX {
   enabled = true;
-  intensity = 0.9;
-  threshold = 0.62;
+  intensity = 1.15; // richer bloom for the neon look
+  threshold = 0.58;
+  aberration = 1.4; // chromatic-aberration strength
+  private elapsed = 0;
 
   private sceneRT: THREE.WebGLRenderTarget;
   private rtA: THREE.WebGLRenderTarget;
@@ -96,7 +111,13 @@ export class PostFX {
     this.compositeMat = new THREE.ShaderMaterial({
       vertexShader: VERT,
       fragmentShader: COMPOSITE_FS,
-      uniforms: { tBase: { value: null }, tBloom: { value: null }, intensity: { value: this.intensity } },
+      uniforms: {
+        tBase: { value: null },
+        tBloom: { value: null },
+        intensity: { value: this.intensity },
+        time: { value: 0 },
+        aberration: { value: this.aberration },
+      },
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.brightMat);
     this.fsScene.add(this.quad);
@@ -143,9 +164,12 @@ export class PostFX {
     }
 
     // 4. composite → screen
+    this.elapsed += 1 / 60;
     this.compositeMat.uniforms.tBase.value = this.sceneRT.texture;
     this.compositeMat.uniforms.tBloom.value = this.rtA.texture;
     this.compositeMat.uniforms.intensity.value = this.intensity;
+    this.compositeMat.uniforms.aberration.value = this.aberration;
+    this.compositeMat.uniforms.time.value = this.elapsed;
     this.quad.material = this.compositeMat;
     this.renderer.setRenderTarget(null);
     this.renderer.render(this.fsScene, this.fsCamera);

@@ -28,6 +28,7 @@ import { CameraRig, CameraMode } from '../camera/CameraRig';
 import { AudioEngine } from '../audio/AudioEngine';
 import { ParticleManager } from '../fx/ParticleSystem';
 import { PostFX } from '../fx/PostFX';
+import { buildEnvironment, EnvProbe } from '../fx/EnvironmentProbe';
 import { CarTelemetry, ReplayBuffer, TelemetryFrame } from './Telemetry';
 import type { GameSettings } from '../core/Settings';
 
@@ -91,6 +92,14 @@ export class GameSession {
   private countdownTimer = 0;
   private lastCountdownInt = COUNTDOWN_SECONDS + 1;
   private accentColor = new THREE.Color(0x00f0ff);
+  private envProbe: EnvProbe | null = null;
+
+  /** Build a neon HDR reflection environment and apply it scene-wide. */
+  private setEnvironment(accents: number[], skyTop: number, skyBottom: number): void {
+    this.envProbe?.dispose();
+    this.envProbe = buildEnvironment(this.renderer, accents, skyTop, skyBottom);
+    this.scene.environment = this.envProbe.texture;
+  }
 
   constructor(
     canvas: HTMLCanvasElement,
@@ -149,6 +158,8 @@ export class GameSession {
     this.scene.add(this.builtTrack.group);
     this.theme = this.builtTrack.theme;
     this.environment = applyEnvironment(this.scene, this.theme);
+    // Neon HDR reflections tinted to the track (wet roads + glossy car paint).
+    this.setEnvironment([this.theme.edgeColor, this.theme.edgeColor2, 0xffffff, this.theme.hemiSky], this.theme.skyTop, this.theme.skyBottom);
     this.camera.buildTripods(this.spline, def.halfWidth);
 
     // grid: cars staggered behind the start line, alternating sides.
@@ -593,6 +604,8 @@ export class GameSession {
     this.scene.fog = new THREE.FogExp2(0x04060d, 0.018);
     this.scene.add(group);
     this.targetRing.set(accent);
+    // Neon showroom reflections (cyan/magenta) so the hero car gleams.
+    this.setEnvironment([0x00f0ff, 0xff2bd6, 0xffffff, 0x7a5cff], 0x05060f, 0x1a0b2e);
     this.showroom = { group, carHolder, car, ringMat, ring2Mat, keyLight, gridCanvas, disposables };
   }
 
@@ -679,6 +692,9 @@ export class GameSession {
   dispose(): void {
     this.disposeShowroom();
     this.teardownRace();
+    this.envProbe?.dispose();
+    this.envProbe = null;
+    this.scene.environment = null;
     this.particles.dispose();
     this.postfx.dispose();
     this.renderer.dispose();
