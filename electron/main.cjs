@@ -18,6 +18,8 @@ const DIST = path.join(__dirname, '..', 'dist');
 const SMOKE = process.argv.includes('--smoke');
 const DEV = process.argv.includes('--dev');
 
+let httpServer = null; // static file server — closed on quit to free the socket/FDs
+
 // Headless / CI hardening: the renderer sandbox frequently fails to spin up in
 // containerised or restricted Windows environments (surfaces as ERR_FAILED on
 // navigation), and modern Chromium gates SwiftShader WebGL behind an explicit
@@ -65,6 +67,7 @@ function startServer() {
         res.writeHead(500).end(String(e));
       }
     });
+    httpServer = server;
     server.listen(0, '127.0.0.1', () => resolve(server.address().port));
     server.on('error', reject);
   });
@@ -106,9 +109,9 @@ async function createWindow() {
   // The freshly-listened socket can briefly refuse connections on Windows, and
   // Electron's net service surfaces that as a fatal ERR_FAILED. Retry with
   // backoff so a transient first-connect miss doesn't abort the launch.
-  const ok = await loadWithRetry(win, url, SMOKE ? 6 : 4);
-  if (!ok) {
-    console.error('[electron] failed to load ' + url + ' after retries');
+  const res = await loadWithRetry(win, url, SMOKE ? 6 : 4);
+  if (!res.ok) {
+    console.error(`[electron] failed to load ${url} after retries. Last error: ${res.error}`);
     if (SMOKE) {
       app.exit(1);
       return;
@@ -122,20 +125,28 @@ async function createWindow() {
 }
 
 async function loadWithRetry(win, url, attempts) {
+  let lastError = null;
   for (let i = 0; i < attempts; i++) {
     try {
       await win.loadURL(url);
-      return true;
+      return { ok: true, error: null };
     } catch (err) {
-      console.error(`[electron] load attempt ${i + 1}/${attempts} failed: ${err && err.message ? err.message : err}`);
+      lastError = err && err.message ? err.message : String(err);
+      console.error(`[electron] load attempt ${i + 1}/${attempts} failed: ${lastError}`);
       await new Promise((r) => setTimeout(r, 300 + i * 300));
     }
   }
-  return false;
+  return { ok: false, error: lastError };
 }
 
 async function runSmoke(win) {
   const deadline = Date.now() + 35000;
+  let pollId = null;
+  const finish = (code, msg) => {
+    if (pollId) clearTimeout(pollId);
+    console.log(msg);
+    app.exit(code);
+  };
   const poll = async () => {
     let result = 'running';
     try {
@@ -150,16 +161,14 @@ async function runSmoke(win) {
       } catch {
         parsed = { pass: false, raw: result };
       }
-      console.log('[smoke] ' + JSON.stringify(parsed));
-      app.exit(parsed.pass ? 0 : 1);
+      finish(parsed.pass ? 0 : 1, '[smoke] ' + JSON.stringify(parsed));
       return;
     }
     if (Date.now() > deadline) {
-      console.error('[smoke] TIMEOUT — last result: ' + result);
-      app.exit(1);
+      finish(1, '[smoke] TIMEOUT — last result: ' + result);
       return;
     }
-    setTimeout(poll, 750);
+    pollId = setTimeout(poll, 750);
   };
   poll();
 }
@@ -171,6 +180,12 @@ app.whenReady().then(createWindow).catch((err) => {
 process.on('unhandledRejection', (err) => {
   console.error('[electron] unhandled rejection:', err);
   if (SMOKE) app.exit(1);
+});
+app.on('before-quit', () => {
+  if (httpServer) {
+    httpServer.close();
+    httpServer = null;
+  }
 });
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

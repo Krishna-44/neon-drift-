@@ -60,6 +60,7 @@ export class WebSocketTransport implements TelemetryTransport {
   private cb: ((m: NetMessage) => void) | null = null;
   private queue: NetMessage[] = [];
   private closed = false;
+  private reconnectId: ReturnType<typeof setTimeout> | null = null;
   connected = false;
 
   constructor(private url: string) {
@@ -86,7 +87,7 @@ export class WebSocketTransport implements TelemetryTransport {
     };
     this.ws.onclose = () => {
       this.connected = false;
-      if (!this.closed) setTimeout(() => this.connect(), 1500); // auto-reconnect
+      if (!this.closed) this.reconnectId = setTimeout(() => this.connect(), 1500); // auto-reconnect
     };
     this.ws.onerror = () => this.ws?.close();
   }
@@ -106,6 +107,10 @@ export class WebSocketTransport implements TelemetryTransport {
   }
   close(): void {
     this.closed = true;
+    if (this.reconnectId !== null) {
+      clearTimeout(this.reconnectId);
+      this.reconnectId = null;
+    }
     this.ws?.close();
   }
 }

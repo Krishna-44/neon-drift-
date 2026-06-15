@@ -437,6 +437,7 @@ export class App {
 
   /** Guided gesture setup overlay (records the user's pose per driving action). */
   private startGestureSetup(): void {
+    if (this.gestureSetupActive) return; // guard: menu button + camera-grant can race
     const video = this.tracker.mode === 'camera' ? this.camera.video : null;
     this.gestureSetupActive = true;
     this.cursor.setActive(false);
@@ -853,6 +854,7 @@ export class App {
     this.tracker.dispose();
     this.camera.stop();
     this.keyboard.detach();
+    this.hud.dispose();
     this.session.dispose();
     this.audio.dispose();
     this.transport.close();

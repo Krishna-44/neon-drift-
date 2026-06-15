@@ -499,6 +499,7 @@ export class GameSession {
     ringMat: THREE.MeshBasicMaterial;
     ring2Mat: THREE.MeshBasicMaterial;
     keyLight: THREE.PointLight;
+    gridCanvas: HTMLCanvasElement;
     disposables: Array<{ dispose(): void }>;
   } | null = null;
   private showroomAngle = 0;
@@ -592,7 +593,7 @@ export class GameSession {
     this.scene.fog = new THREE.FogExp2(0x04060d, 0.018);
     this.scene.add(group);
     this.targetRing.set(accent);
-    this.showroom = { group, carHolder, car, ringMat, ring2Mat, keyLight, disposables };
+    this.showroom = { group, carHolder, car, ringMat, ring2Mat, keyLight, gridCanvas, disposables };
   }
 
   private disposeShowroom(): void {
@@ -600,6 +601,9 @@ export class GameSession {
     this.scene.remove(this.showroom.group);
     for (const d of this.showroom.disposables) d.dispose();
     this.showroom.car.dispose();
+    // CanvasTexture.dispose() keeps the backing <canvas>; shrink it to free the
+    // bitmap so menu↔race cycles don't accumulate detached 256² canvases.
+    this.showroom.gridCanvas.width = this.showroom.gridCanvas.height = 0;
     this.scene.fog = null;
     this.showroom = null;
   }

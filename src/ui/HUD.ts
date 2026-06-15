@@ -193,13 +193,20 @@ export class HUD {
       this.hintStrip, this.noHandsEl, this.deltaPopups, this.driftFlare,
     ]);
     this.resizeFx();
-    window.addEventListener('resize', () => this.resizeFx());
+    window.addEventListener('resize', this.handleResize);
     void this.wheelAngleText;
   }
+
+  private handleResize = (): void => this.resizeFx();
 
   private resizeFx(): void {
     this.motionCanvas.width = window.innerWidth;
     this.motionCanvas.height = window.innerHeight;
+  }
+
+  /** Remove the window listener (called from App.dispose). */
+  dispose(): void {
+    window.removeEventListener('resize', this.handleResize);
   }
 
   /** Gate the heavy speed-FX with the particle/quality setting (PerfGovernor). */
