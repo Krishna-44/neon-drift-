@@ -9,6 +9,8 @@ No controller. No keyboard required. Just hold an invisible steering wheel in th
 
 `MediaPipe Hands` · `Three.js` · `TypeScript` · `WebAudio` · `Electron`
 
+**Created by Krishna**
+
 </div>
 
 ---

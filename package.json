@@ -2,6 +2,8 @@
   "name": "neondrift-gp",
   "version": "1.0.0",
   "description": "NEONDRIFT GP — gesture-controlled racing simulator. Webcam hand-tracking drives the car: no controller required.",
+  "author": "Krishna",
+  "license": "MIT",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
