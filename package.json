@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "vitest bench --run",
-    "setup": "node scripts/fetch-model.mjs",
+    "setup": "node scripts/fetch-model.mjs && node scripts/fetch-hdri.mjs",
     "postinstall": "node scripts/copy-assets.mjs",
     "desktop": "npm run build && electron .",
     "desktop:dev": "electron . --dev",

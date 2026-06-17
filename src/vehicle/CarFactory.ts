@@ -35,7 +35,12 @@ export const CAR_STATS: ReadonlyArray<{ accel: number; handling: number; top: nu
   { accel: 86, handling: 76, top: 82 },
 ];
 
-export function buildCar(accent: number, isPlayer: boolean): CarHandles {
+/**
+ * @param bodyModel  optional GLB scene (drop a car.glb in public/models/) — when
+ *   supplied it replaces the procedural box body; neon sills/underglow/wheels/
+ *   lights/nitro are still added so the car keeps its FX and HUD bindings.
+ */
+export function buildCar(accent: number, isPlayer: boolean, bodyModel?: THREE.Object3D): CarHandles {
   const group = new THREE.Group();
   const body = new THREE.Group();
   group.add(body);
@@ -66,26 +71,49 @@ export function buildCar(accent: number, isPlayer: boolean): CarHandles {
   const glass = keep(new THREE.MeshStandardMaterial({ color: 0x05060a, metalness: 0.9, roughness: 0.08, envMapIntensity: 1.6 }));
   const tire = keep(new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.95 }));
 
-  // hull
-  const hull = new THREE.Mesh(keep(new THREE.BoxGeometry(1.84, 0.5, 4.3)), paint);
-  hull.position.y = 0.5;
-  body.add(hull);
-  // nose wedge
-  const nose = new THREE.Mesh(keep(new THREE.BoxGeometry(1.6, 0.3, 0.9)), paint);
-  nose.position.set(0, 0.38, 2.3);
-  body.add(nose);
-  // cabin
-  const cabin = new THREE.Mesh(keep(new THREE.BoxGeometry(1.42, 0.44, 1.9)), glass);
-  cabin.position.set(0, 0.93, -0.25);
-  body.add(cabin);
-  // spoiler
-  const spoiler = new THREE.Mesh(keep(new THREE.BoxGeometry(1.78, 0.07, 0.5)), paint);
-  spoiler.position.set(0, 0.98, -2.05);
-  body.add(spoiler);
-  for (const sx of [-0.6, 0.6]) {
-    const strut = new THREE.Mesh(keep(new THREE.BoxGeometry(0.08, 0.3, 0.12)), paint);
-    strut.position.set(sx, 0.82, -2.0);
-    body.add(strut);
+  if (bodyModel) {
+    // User-supplied GLB car: fit it to ~4.3 m long, orient forward (+Z), and let
+    // it pick up the neon HDR environment so it gleams like the procedural paint.
+    const model = bodyModel.clone(true);
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const longest = Math.max(size.x, size.z) || 1;
+    const s = 4.3 / longest;
+    model.scale.setScalar(s);
+    const box2 = new THREE.Box3().setFromObject(model);
+    const center = new THREE.Vector3();
+    box2.getCenter(center);
+    model.position.sub(center);
+    model.position.y -= box2.min.y - center.y; // sit on the ground
+    model.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      const mat = mesh.material as THREE.MeshStandardMaterial | undefined;
+      if (mat && 'envMapIntensity' in mat) mat.envMapIntensity = 1.3;
+    });
+    body.add(model);
+  } else {
+    // hull
+    const hull = new THREE.Mesh(keep(new THREE.BoxGeometry(1.84, 0.5, 4.3)), paint);
+    hull.position.y = 0.5;
+    body.add(hull);
+    // nose wedge
+    const nose = new THREE.Mesh(keep(new THREE.BoxGeometry(1.6, 0.3, 0.9)), paint);
+    nose.position.set(0, 0.38, 2.3);
+    body.add(nose);
+    // cabin
+    const cabin = new THREE.Mesh(keep(new THREE.BoxGeometry(1.42, 0.44, 1.9)), glass);
+    cabin.position.set(0, 0.93, -0.25);
+    body.add(cabin);
+    // spoiler
+    const spoiler = new THREE.Mesh(keep(new THREE.BoxGeometry(1.78, 0.07, 0.5)), paint);
+    spoiler.position.set(0, 0.98, -2.05);
+    body.add(spoiler);
+    for (const sx of [-0.6, 0.6]) {
+      const strut = new THREE.Mesh(keep(new THREE.BoxGeometry(0.08, 0.3, 0.12)), paint);
+      strut.position.set(sx, 0.82, -2.0);
+      body.add(strut);
+    }
   }
 
   // neon sills + light bars

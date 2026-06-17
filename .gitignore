@@ -7,6 +7,7 @@ release/
 # Generated assets (recreated by `npm install` + `npm run setup`)
 public/mediapipe/
 public/models/*.task
+public/hdri/*.hdr
 
 # Editor / OS noise
 .vscode/*

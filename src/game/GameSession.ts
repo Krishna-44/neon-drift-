@@ -29,6 +29,8 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { ParticleManager } from '../fx/ParticleSystem';
 import { PostFX } from '../fx/PostFX';
 import { buildEnvironment, EnvProbe } from '../fx/EnvironmentProbe';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CarTelemetry, ReplayBuffer, TelemetryFrame } from './Telemetry';
 import type { GameSettings } from '../core/Settings';
 
@@ -93,12 +95,57 @@ export class GameSession {
   private lastCountdownInt = COUNTDOWN_SECONDS + 1;
   private accentColor = new THREE.Color(0x00f0ff);
   private envProbe: EnvProbe | null = null;
+  private hdriEnv: THREE.Texture | null = null;
+  private hdriRT: THREE.WebGLRenderTarget | null = null;
 
-  /** Build a neon HDR reflection environment and apply it scene-wide. */
+  /**
+   * Apply a reflection environment scene-wide. Prefers a real HDRI (downloaded
+   * to public/hdri/env.hdr) once it has loaded; falls back to the procedural
+   * neon probe so reflections work even with no asset present.
+   */
   private setEnvironment(accents: number[], skyTop: number, skyBottom: number): void {
+    if (this.hdriEnv) {
+      this.scene.environment = this.hdriEnv;
+      return;
+    }
     this.envProbe?.dispose();
     this.envProbe = buildEnvironment(this.renderer, accents, skyTop, skyBottom);
     this.scene.environment = this.envProbe.texture;
+  }
+
+  private carModel: THREE.Object3D | null = null;
+
+  /** Optional player car model: drop a car.glb in public/models/ and it's used. */
+  private async loadCarModel(): Promise<void> {
+    try {
+      const base = new URL(import.meta.env.BASE_URL, document.baseURI).href;
+      const url = new URL('models/car.glb', base).href;
+      const head = await fetch(url, { method: 'HEAD' });
+      if (!head.ok) return; // none provided → keep the procedural car
+      const gltf = await new GLTFLoader().loadAsync(url);
+      this.carModel = gltf.scene;
+    } catch {
+      /* no/invalid model → procedural car */
+    }
+  }
+
+  /** Load the optional HDRI (RGBE → PMREM). Once ready it takes over reflections. */
+  private async loadHdriEnvironment(): Promise<void> {
+    try {
+      const base = new URL(import.meta.env.BASE_URL, document.baseURI).href;
+      const url = new URL('hdri/env.hdr', base).href;
+      const tex = await new RGBELoader().loadAsync(url);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      const pmrem = new THREE.PMREMGenerator(this.renderer);
+      pmrem.compileEquirectangularShader();
+      this.hdriRT = pmrem.fromEquirectangular(tex);
+      pmrem.dispose();
+      tex.dispose();
+      this.hdriEnv = this.hdriRT.texture;
+      this.scene.environment = this.hdriEnv; // upgrade reflections in place
+    } catch {
+      /* no HDRI present → keep the procedural environment */
+    }
   }
 
   constructor(
@@ -131,6 +178,8 @@ export class GameSession {
     );
 
     this.resize(canvas.clientWidth, canvas.clientHeight);
+    void this.loadHdriEnvironment(); // upgrades reflections once the HDRI loads
+    void this.loadCarModel(); // uses public/models/car.glb if present
   }
 
   get racePhase() {
@@ -205,7 +254,7 @@ export class GameSession {
 
       let color = isPlayer ? this.settings.playerCarColor : CAR_COLORS[(i + 2) % CAR_COLORS.length];
       if (!isPlayer && color === this.settings.playerCarColor) color = CAR_COLORS[(i + 3) % CAR_COLORS.length];
-      const handles = buildCar(color, isPlayer);
+      const handles = buildCar(color, isPlayer, isPlayer ? this.carModel ?? undefined : undefined);
       this.scene.add(handles.group);
       const visual = new CarVisual(handles);
 
@@ -589,7 +638,7 @@ export class GameSession {
 
     // showcase car on a turntable holder (so we can spin it on swap)
     const carHolder = new THREE.Group();
-    const car = buildCar(accent, false);
+    const car = buildCar(accent, false, this.carModel ?? undefined);
     carHolder.add(car.group);
     group.add(carHolder);
 
@@ -636,7 +685,7 @@ export class GameSession {
         this.swapPending = null;
         sr.car.dispose();
         sr.carHolder.remove(sr.car.group);
-        sr.car = buildCar(accent, false);
+        sr.car = buildCar(accent, false, this.carModel ?? undefined);
         sr.carHolder.add(sr.car.group);
         this.targetRing.set(accent);
         // settings.playerCarColor is persisted by the App on cycle; mutate the
@@ -694,6 +743,9 @@ export class GameSession {
     this.teardownRace();
     this.envProbe?.dispose();
     this.envProbe = null;
+    this.hdriRT?.dispose();
+    this.hdriRT = null;
+    this.hdriEnv = null;
     this.scene.environment = null;
     this.particles.dispose();
     this.postfx.dispose();
