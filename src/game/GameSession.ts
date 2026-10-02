@@ -29,7 +29,7 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { ParticleManager } from '../fx/ParticleSystem';
 import { PostFX } from '../fx/PostFX';
 import { buildEnvironment, EnvProbe } from '../fx/EnvironmentProbe';
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/examples/jsm/loaders/HDRLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { CarTelemetry, ReplayBuffer, TelemetryFrame } from './Telemetry';
 import type { GameSettings } from '../core/Settings';
@@ -121,7 +121,8 @@ export class GameSession {
       const base = new URL(import.meta.env.BASE_URL, document.baseURI).href;
       const url = new URL('models/car.glb', base).href;
       const head = await fetch(url, { method: 'HEAD' });
-      if (!head.ok) return; // none provided → keep the procedural car
+      // Dev servers answer missing files with index.html, so check the type too.
+      if (!head.ok || head.headers.get('content-type')?.includes('text/html')) return;
       const gltf = await new GLTFLoader().loadAsync(url);
       this.carModel = gltf.scene;
     } catch {
@@ -134,7 +135,20 @@ export class GameSession {
     try {
       const base = new URL(import.meta.env.BASE_URL, document.baseURI).href;
       const url = new URL('hdri/env.hdr', base).href;
-      const tex = await new RGBELoader().loadAsync(url);
+      // Validate before parsing: a missing file comes back as index.html from
+      // dev/static servers, and the parser throws outside the promise on junk.
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      const magic = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(2, buf.byteLength)));
+      if (magic !== '#?') return;
+      const blobUrl = URL.createObjectURL(new Blob([buf]));
+      let tex: THREE.DataTexture;
+      try {
+        tex = await new HDRLoader().loadAsync(blobUrl);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
       tex.mapping = THREE.EquirectangularReflectionMapping;
       const pmrem = new THREE.PMREMGenerator(this.renderer);
       pmrem.compileEquirectangularShader();

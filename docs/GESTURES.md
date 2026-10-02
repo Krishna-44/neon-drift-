@@ -20,15 +20,15 @@ wheel (used for pausing).
 
 | Control | Detection | Notes |
 |---|---|---|
-| **Throttle** | Closed hand, thumb pointing **down** (`thumbDown`) | Throttle is proportional to how far below horizontal your thumb points, mapped through your calibrated thumb range and a softness (expo) curve. |
+| **Throttle** | Fist (`fist`) | One fist = strong gas (85 %); **both** fists = full throttle. |
 | **Reverse** | Closed hand, thumb pointing **up** (`thumbUp`) | Engages reverse gear when slow; at speed it acts as engine braking first. |
-| **Brake** | Fist (`fist`) | One fist = strong brake; **both** fists = maximum brake. |
+| **Brake** | Closed hand, thumb pointing **down** (`thumbDown`) | One thumb = strong brake; **both** thumbs = maximum brake. |
 | **Nitro** | Peace / V sign (`peace`) | Index + middle extended, ring + pinky curled. Drains a regenerating tank. |
-| **Drift** | Fist **while** the wheel is turned past ~45 % | Pulls the handbrake (rear-grip cut) for controlled slides — the spec's "tilt + fist" combo. |
+| **Drift** | Thumb down **while** the wheel is turned past ~45 % | Pulls the handbrake (rear-grip cut) for controlled slides. |
 | **Pause** | Open palm held 2 s | A ring fills while you hold; releasing early cancels. |
 | **Menu cursor** | Point (index only) moves a cursor; **pinch** (thumb ↔ index) clicks | Used on all menus/screens. |
 
-Which hand provides thumb-throttle is configurable (Settings → Controls → *Throttle Hand*:
+Which hand reads the fist (gas) and thumb (brake/reverse) gestures is configurable (Settings → Controls → *Throttle Hand*:
 Either / Right / Left).
 
 ## Calibration (do this first)

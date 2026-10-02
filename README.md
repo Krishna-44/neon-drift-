@@ -24,7 +24,7 @@ all rendered in a neon/cyberpunk 3D world with AI opponents, four tracks, drifti
 and spectator/telemetry support.
 
 It is built as a **modular, production-grade architecture**, not a demo: a deterministic fixed-step
-simulation core, a CV thread separated from the render thread, 78 automated tests, performance
+simulation core, a CV thread separated from the render thread, 82 automated tests, performance
 benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry transport.
 
 > **Plays without a camera too.** If no webcam/permission is available, the game drops into a
@@ -37,11 +37,11 @@ benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry tran
 | Gesture | Action |
 |---|---|
 | ✋ ✋ Both hands up like a wheel | **Steer** — the line between your hands *is* the wheel; rotate to turn |
-| 👎 Right-hand thumb **down** | **Throttle** — steeper thumb = more gas (analogue) |
+| ✊ Fist | **Throttle** — one fist = strong gas, both fists = full gas |
+| 👎 Thumb **down** | **Brake** (both thumbs = max brake) |
 | 👍 Thumb **up** | **Reverse** gear |
-| ✊ Fist | **Brake** (both fists = max brake) |
 | ✌️ Peace / V sign | **Nitro** boost |
-| ✊ + hard turn | **Drift** (handbrake) |
+| 👎 + hard turn | **Drift** (handbrake) |
 | ✋ Open palm held 2 s | **Pause** |
 | ☝️ Point + pinch | **Menu navigation** (gesture cursor) |
 
@@ -50,7 +50,32 @@ benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry tran
 
 ---
 
-## Quick start
+## Play now
+
+**In your browser — no install:** once GitHub Pages is enabled (see below), the game is live at
+**https://krishna-44.github.io/neon-drift-/**. Open it in Chrome or Edge, click **Enable Camera** (or
+**Use Demo + Keyboard**), then **Race**.
+
+**On your own machine (one command):**
+
+```bash
+npm install && npm start      # → opens http://localhost:5173
+```
+
+On Windows you can instead double-click `scripts\setup.bat`, then run `npm start`.
+
+> Camera access requires `https://` or `localhost` — opening `index.html` directly from disk won't
+> work. Use `npm start`, `npm run preview` (after `npm run build`), or the hosted link.
+
+### Enabling the hosted version (one-time)
+
+The workflow in `.github/workflows/deploy.yml` builds and publishes the game on every push to
+`main`. To switch it on: **GitHub repo → Settings → Pages → Build and deployment → Source:
+GitHub Actions**. Then push to `main` (or run the workflow manually from the **Actions** tab).
+
+---
+
+## Quick start (development)
 
 ```bash
 # 1. install (also copies the MediaPipe WASM runtime into public/)
@@ -66,7 +91,7 @@ npm run dev          # → http://localhost:5173
 npm run desktop      # builds + launches the native window
 
 # Tests / benchmarks
-npm test             # 78 unit + integration tests
+npm test             # 82 unit + integration tests
 npm run bench        # per-frame performance benchmarks
 ```
 
