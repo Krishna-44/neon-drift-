@@ -20,27 +20,28 @@ wheel (used for pausing).
 
 | Control | Detection | Notes |
 |---|---|---|
-| **Throttle** | Closed hand, thumb pointing **down** (`thumbDown`) | Throttle is proportional to how far below horizontal your thumb points, mapped through your calibrated thumb range and a softness (expo) curve. |
+| **Throttle** | Fist (`fist`) | One fist = strong throttle; **both** fists = full gas. |
 | **Reverse** | Closed hand, thumb pointing **up** (`thumbUp`) | Engages reverse gear when slow; at speed it acts as engine braking first. |
-| **Brake** | Fist (`fist`) | One fist = strong brake; **both** fists = maximum brake. |
+| **Brake** | Closed hand, thumb pointing **down** (`thumbDown`) | One thumb = strong brake; **both** thumbs = maximum brake. |
 | **Nitro** | Peace / V sign (`peace`) | Index + middle extended, ring + pinky curled. Drains a regenerating tank. |
-| **Drift** | Fist **while** the wheel is turned past ~45 % | Pulls the handbrake (rear-grip cut) for controlled slides — the spec's "tilt + fist" combo. |
+| **Drift** | Thumb down **while** the wheel is turned past ~45 % | Pulls the handbrake (rear-grip cut) for controlled slides. |
 | **Pause** | Open palm held 2 s | A ring fills while you hold; releasing early cancels. |
 | **Menu cursor** | Point (index only) moves a cursor; **pinch** (thumb ↔ index) clicks | Used on all menus/screens. |
 
-Which hand provides thumb-throttle is configurable (Settings → Controls → *Throttle Hand*:
-Either / Right / Left).
+Which hand's fist counts as throttle is configurable (Settings → Controls → *Throttle Hand*:
+Either / Right / Left). Prefer your own poses? **Menu → Set Up Gestures** records each driving
+action from your hand.
 
 ## Calibration (do this first)
 
-**Menu → Calibrate Hands.** Three quick steps captured from your own movement:
+**Menu → Calibrate Wheel.** Three quick steps captured from your own movement:
 
 1. **Neutral** — hold the wheel relaxed and level for ~2.5 s. Captures your wheel-centre angle and
    grip width.
 2. **Lock** — turn full-left then full-right as far as is comfortable. Captures your steering range
    (90 % of your reach maps to full lock, so you never have to strain).
-3. **Throttle** — thumb-down and sweep from slightly-down to fully-down. Captures your thumb angle
-   range so throttle uses your full motion.
+3. **Thumb sweep** — thumb-down and sweep from slightly-down to fully-down. Captures your thumb
+   angle range.
 
 Calibration is persisted; you only redo it if your seating/camera changes.
 
@@ -60,7 +61,7 @@ Inconsistent recordings are rejected with a prompt to retry.
 | **Steering Smoothing** | One-Euro strength on the steer signal | …steering feels jittery (raise) or laggy (lower) |
 | **Dead Zone** | Degrees around centre that read as straight | …the car drifts when you hold straight (raise) |
 | **Throttle Softness** | Expo curve on throttle | …throttle feels too on/off (raise for a softer centre) |
-| **Throttle Hand** | Which hand's thumb gives gas | …you prefer your dominant hand |
+| **Throttle Hand** | Which hand's fist gives gas | …you prefer your dominant hand |
 | **Stability / Counter-Steer Assist** | Yaw damping + auto counter-steer | …the car spins too easily (enable) |
 | **Adaptive Assists** | Auto-tunes the above from your driving | …you want the game to adjust to you |
 

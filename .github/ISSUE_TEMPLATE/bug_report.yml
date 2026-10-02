@@ -1,0 +1,30 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the menu
+        2. Click Race → Sakura Pass
+        3. ...
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      description: Browser / Electron version, OS, GPU, webcam model
+      placeholder: Chrome 128, Windows 11, RTX 3060, Logitech C920
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output or screenshot
+      description: Press H in-game for the perf HUD; paste any console errors.
