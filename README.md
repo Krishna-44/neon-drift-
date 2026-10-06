@@ -104,6 +104,15 @@ npm run bench        # per-frame performance benchmarks
 Open the page, allow camera access, hit **Race**, and hold up your hands. First time? Run
 **Calibrate Wheel** so the wheel centre and steering range match *your* body.
 
+### Custom assets (optional)
+
+- **Reflections:** `npm run setup` downloads a CC0 neon HDRI from Poly Haven into
+  `public/hdri/env.hdr`. When present it drives scene reflections; otherwise the game uses a
+  procedural neon environment.
+- **Your own car:** put a glTF binary at `public/models/car.glb`. It replaces the procedural body
+  of the player and showroom car, auto-scaled to about 4.3 m long and facing +Z; the neon lights,
+  wheels and nitro effects stay.
+
 ---
 
 ## Architecture
