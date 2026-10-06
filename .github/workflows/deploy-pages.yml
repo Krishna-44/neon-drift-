@@ -31,15 +31,20 @@ jobs:
         run: |
           if gh api "repos/${{ github.repository }}/pages" --silent 2>/dev/null; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
+          # Not enabled yet: try to switch it on (Source: GitHub Actions).
+          elif gh api -X POST "repos/${{ github.repository }}/pages" -f build_type=workflow; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::Enabled GitHub Pages (Source: GitHub Actions)."
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::GitHub Pages is not enabled for this repo (Settings → Pages → Source: GitHub Actions). Skipping deploy."
+            echo "::notice::GitHub Pages is not enabled for this repo and the workflow token can't enable it (Settings → Pages → Source: GitHub Actions). Skipping deploy."
           fi
 
   build:
     name: Build
     needs: check
-    if: needs.check.outputs.enabled == 'true'
+    # The github-pages environment only accepts deploys from the default branch.
+    if: needs.check.outputs.enabled == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
@@ -50,6 +55,9 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Serve the hand model + HDRI from the site itself (falls back to CDN / procedural if this fails).
+      - run: npm run setup
+        continue-on-error: true
       - run: npx vite build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
@@ -63,6 +71,31 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  smoke:
+    name: Smoke-test live site
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright + Chromium
+        run: |
+          npm i --prefix "$RUNNER_TEMP/pw" --no-fund --no-audit playwright@1.56.1
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          cp scripts/smoke-live.mjs "$RUNNER_TEMP/pw/"
+      - name: Play the live site (demo race + camera path)
+        run: node "$RUNNER_TEMP/pw/smoke-live.mjs" "${{ needs.deploy.outputs.page_url }}" smoke-shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-smoke-screenshots
+          path: smoke-shots/
+          if-no-files-found: ignore
