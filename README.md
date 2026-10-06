@@ -2,16 +2,44 @@
 
 # 🏎️ NEONDRIFT GP
 
-### Gesture-Controlled 3D Racing Simulator
+### Gesture-controlled 3D racing simulator — drive with your hands and a webcam
 
-**Drive a real car simulation with nothing but your hands and a webcam.**
-No controller. No keyboard required. Just hold an invisible steering wheel in the air.
+[![CI](https://github.com/Krishna-44/neon-drift-/actions/workflows/ci.yml/badge.svg)](https://github.com/Krishna-44/neon-drift-/actions/workflows/ci.yml)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)
+![Three.js](https://img.shields.io/badge/Three.js-r180-000000?logo=threedotjs&logoColor=white)
+![MediaPipe](https://img.shields.io/badge/MediaPipe-Hand%20Landmarker-0097A7?logo=google&logoColor=white)
+![Electron](https://img.shields.io/badge/Electron-desktop-47848F?logo=electron&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-`MediaPipe Hands` · `Three.js` · `TypeScript` · `WebAudio` · `Electron`
+**[▶ Live demo](https://krishna-44.github.io/neon-drift-/)** ·
+**[⬇ Download for Windows](https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe)** ·
+[Architecture](docs/ARCHITECTURE.md) ·
+[Gesture guide](docs/GESTURES.md) ·
+[Roadmap](docs/ROADMAP.md)
 
-**Created by Krishna**
+<img src="docs/media/main-menu.jpg" width="100%" alt="NEONDRIFT GP main menu: neon title, menu buttons and a live 3D car showroom">
+
+No controller. No keyboard required. Hold an invisible steering wheel in the air and drive.
 
 </div>
+
+## Highlights
+
+- **Real-time computer vision** — MediaPipe Hand Landmarker tracks 21 landmarks per hand in a Web
+  Worker, so inference never blocks rendering; One-Euro filtering plus velocity prediction keep
+  steering smooth *and* responsive.
+- **Gesture recognition that doesn't flicker** — rotation-invariant hand features, a pose cascade
+  and temporal hysteresis; the test suite checks ≥95 % accuracy over 200 noisy trials and that
+  alternating-noise streams never chatter.
+- **Personalised controls** — record your own pose for each driving action; live hands are
+  classified by weighted nearest-centroid against your recordings, with an explicit idle class so a
+  relaxed hand never fires an action.
+- **Real vehicle simulation** — deterministic 120 Hz fixed-step physics with a slip-angle tyre
+  model, weight transfer and handbrake drifting; AI opponents drive the same car model using
+  Stanley path tracking.
+- **Engineered like a product** — strict TypeScript, 80+ unit and integration tests (including an
+  end-to-end headless race), performance benchmarks, an adaptive-quality governor, CI, and an
+  Electron desktop build.
 
 ---
 
@@ -24,11 +52,13 @@ all rendered in a neon/cyberpunk 3D world with AI opponents, four tracks, drifti
 and spectator/telemetry support.
 
 It is built as a **modular, production-grade architecture**, not a demo: a deterministic fixed-step
-simulation core, a CV thread separated from the render thread, 82 automated tests, performance
+simulation core, a CV thread separated from the render thread, 80+ automated tests, performance
 benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry transport.
 
 > **Plays without a camera too.** If no webcam/permission is available, the game drops into a
 > synthetic "ghost driver" demo and the full keyboard fallback — so it is always runnable.
+
+<img src="docs/media/in-race.jpg" width="100%" alt="In-race view on the Sakura Pass track: speedometer, live gesture chips, minimap and the CV feed with hand skeletons">
 
 ---
 
@@ -37,13 +67,15 @@ benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry tran
 | Gesture | Action |
 |---|---|
 | ✋ ✋ Both hands up like a wheel | **Steer** — the line between your hands *is* the wheel; rotate to turn |
-| ✊ Fist | **Throttle** — one fist = strong gas, both fists = full gas |
-| 👎 Thumb **down** | **Brake** (both thumbs = max brake) |
+| ✊ Fist | **Throttle** — one fist = strong, both fists = full gas |
 | 👍 Thumb **up** | **Reverse** gear |
+| 👎 Thumb **down** | **Brake** (both thumbs = max brake) |
 | ✌️ Peace / V sign | **Nitro** boost |
 | 👎 + hard turn | **Drift** (handbrake) |
 | ✋ Open palm held 2 s | **Pause** |
 | ☝️ Point + pinch | **Menu navigation** (gesture cursor) |
+
+Every driving gesture can be re-recorded with your own pose via **Set Up Gestures**.
 
 **Keyboard fallback:** `↑/W` throttle · `↓/S` brake · `←→/AD` steer · `Space` drift · `Shift` nitro ·
 `R` reverse · `C` camera · `V` record · `H` perf HUD · `Esc` pause.
@@ -52,35 +84,20 @@ benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry tran
 
 ## Play now
 
-**On Windows — download and install (adds a desktop shortcut):**
-**[⬇ NEONDRIFT-GP-Setup.exe](https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe)**
-(all versions on the [Releases page](https://github.com/Krishna-44/neon-drift-/releases)). The app
-is unsigned, so if Windows SmartScreen warns, click **More info → Run anyway**.
+- **Windows desktop app:** download
+  **[NEONDRIFT-GP-Setup.exe](https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe)**
+  and run it — it installs the game and adds a desktop shortcut. The app is unsigned, so if Windows
+  SmartScreen warns, click **More info → Run anyway**. All versions are on the
+  [Releases page](https://github.com/Krishna-44/neon-drift-/releases).
+- **In the browser:** open the **[live demo](https://krishna-44.github.io/neon-drift-/)** in Chrome
+  or Edge, click **Enable Camera** (or **Use Demo + Keyboard**), then **Race**.
+- **From source:** `npm install && npm start` (opens http://localhost:5173).
 
-**In your browser — no install:** once GitHub Pages is enabled (see below), the game is live at
-**https://krishna-44.github.io/neon-drift-/**. Open it in Chrome or Edge, click **Enable Camera** (or
-**Use Demo + Keyboard**), then **Race**.
-
-**On your own machine (one command):**
-
-```bash
-npm install && npm start      # → opens http://localhost:5173
-```
-
-On Windows you can instead double-click `scripts\setup.bat`, then run `npm start`.
-
-> Camera access requires `https://` or `localhost` — opening `index.html` directly from disk won't
-> work. Use `npm start`, `npm run preview` (after `npm run build`), or the hosted link.
-
-### Enabling the hosted version (one-time)
-
-The workflow in `.github/workflows/deploy.yml` builds and publishes the game on every push to
-`main`. To switch it on: **GitHub repo → Settings → Pages → Build and deployment → Source:
-GitHub Actions**. Then push to `main` (or run the workflow manually from the **Actions** tab).
+> Camera access needs `https://` or `localhost` — opening `index.html` straight from disk won't work.
 
 ---
 
-## Quick start (development)
+## Quick start
 
 ```bash
 # 1. install (also copies the MediaPipe WASM runtime into public/)
@@ -96,12 +113,21 @@ npm run dev          # → http://localhost:5173
 npm run desktop      # builds + launches the native window
 
 # Tests / benchmarks
-npm test             # 82 unit + integration tests
+npm test             # 80+ unit + integration tests
 npm run bench        # per-frame performance benchmarks
 ```
 
 Open the page, allow camera access, hit **Race**, and hold up your hands. First time? Run
-**Calibrate Hands** so the wheel centre and your thumb-throttle range match *your* body.
+**Calibrate Wheel** so the wheel centre and steering range match *your* body.
+
+### Custom assets (optional)
+
+- **Reflections:** `npm run setup` downloads a CC0 neon HDRI from Poly Haven into
+  `public/hdri/env.hdr`. When present it drives scene reflections; otherwise the game uses a
+  procedural neon environment.
+- **Your own car:** put a glTF binary at `public/models/car.glb`. It replaces the procedural body
+  of the player and showroom car, auto-scaled to about 4.3 m long and facing +Z; the neon lights,
+  wheels and nitro effects stay.
 
 ---
 
@@ -249,7 +275,7 @@ npm run bench       # performance benchmarks
 npm run desktop:smoke   # Electron headless self-test (synthetic race, exits 0/1)
 ```
 
-**78 tests** cover: feature extraction & classification (incl. 200-trial noisy accuracy ≥95 %),
+**80+ tests** cover: feature extraction & classification (incl. 200-trial noisy accuracy ≥95 %),
 anti-flicker stabilisation, One-Euro filtering, the full gesture→control mapping, vehicle dynamics
 (acceleration, braking, drift, reverse, grip, 60 s fuzz with no NaN), spline/track math, wall &
 car-vs-car collisions, AI full-lap completion on every track, the race director (lap/checkpoint/
@@ -267,9 +293,8 @@ the real pipeline from synthetic hands all the way to a finished race.
 - **Build:** Vite. **Desktop:** Electron. **Tests:** Vitest.
 - **Net:** native WebSocket + a hand-rolled zero-dependency relay server.
 
-> **Why a web stack instead of Unity/Unreal?** The request listed those as *recommended*; the hard
-> requirement was the best stack for real-time CV-driven gameplay that *runs locally on Windows*.
-> MediaPipe's first-class web runtime + Three.js gives a single, dependency-light, fully-inspectable
+> **Design decision — why a web stack instead of Unity/Unreal?** The goal was the best stack for
+> real-time, CV-driven gameplay that *runs locally on Windows*. MediaPipe's first-class web runtime + Three.js gives a single, dependency-light, fully-inspectable
 > codebase that runs in the browser **and** ships as a native Electron app — with the CV model and
 > game logic in the same language, no engine licence, and no multi-GB editor install. The simulation
 > core is engine-agnostic, so a Unity/Unreal front-end could consume the same gesture/telemetry
@@ -285,6 +310,14 @@ the Electron shell satisfy this).
 
 ---
 
+## Contributing
+
+Issues and pull requests are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ## License
 
 MIT — see [`LICENSE`](LICENSE).
+
+## Author
+
+Built by **Krishna** — [@Krishna-44](https://github.com/Krishna-44).

@@ -4,17 +4,18 @@
  * Steps:
  *  1. neutral  — hold the wheel relaxed: captures centre angle + hand span
  *  2. lock     — turn to comfortable full left & right: captures max lock
- *  3. throttle — thumb-down sweep: captures the user's thumb angle range
+ *
+ * Throttle and brake are discrete poses (fist / thumb-down), so they need no
+ * range calibration; personal poses are recorded by the gesture setup wizard.
  */
 import { clamp, wrapAngle } from '../core/MathUtils';
 import type { CalibrationData } from '../core/Settings';
 import type { HandsState } from '../vision/HandTypes';
 
-export type CalibrationStep = 'neutral' | 'lock' | 'throttle' | 'done';
+export type CalibrationStep = 'neutral' | 'lock' | 'done';
 
 const NEUTRAL_SECONDS = 2.5;
 const LOCK_SECONDS = 6;
-const THROTTLE_SECONDS = 5;
 
 export class CalibrationSession {
   step: CalibrationStep = 'neutral';
@@ -30,8 +31,6 @@ export class CalibrationSession {
   private samples = 0;
   private maxLeft = 0;
   private maxRight = 0;
-  private thumbMin = Infinity;
-  private thumbMax = -Infinity;
   private result: CalibrationData;
 
   constructor(base: CalibrationData) {
@@ -82,26 +81,6 @@ export class CalibrationSession {
           const lock = Math.min(this.maxLeft, this.maxRight);
           // Sane bounds: 25°..110°; use 90% of reach so full lock is comfortable.
           this.result.maxLockAngle = clamp(lock * 0.9, (25 * Math.PI) / 180, (110 * Math.PI) / 180);
-          this.next('throttle', 'Make a fist and point your THUMB DOWN. Sweep it from slightly down to fully down.');
-        }
-        return false;
-      }
-      case 'throttle': {
-        const hand = right?.pose === 'thumbDown' ? right : left?.pose === 'thumbDown' ? left : null;
-        if (hand) {
-          const a = hand.features.thumbDownAngle;
-          this.thumbMin = Math.min(this.thumbMin, a);
-          this.thumbMax = Math.max(this.thumbMax, a);
-          this.elapsed += dt;
-        } else {
-          this.message = 'Thumb down over a closed fist — like a "thumbs down".';
-        }
-        this.progress = clamp(this.elapsed / THROTTLE_SECONDS, 0, 1);
-        if (this.elapsed >= THROTTLE_SECONDS) {
-          if (isFinite(this.thumbMin) && this.thumbMax - this.thumbMin > 0.12) {
-            this.result.throttleMinAngle = clamp(this.thumbMin + 0.05, 0.05, 1.2);
-            this.result.throttleMaxAngle = clamp(this.thumbMax - 0.05, this.result.throttleMinAngle + 0.15, 1.5);
-          }
           this.result.calibratedAt = Date.now();
           this.step = 'done';
           this.progress = 1;

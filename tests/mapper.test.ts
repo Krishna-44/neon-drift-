@@ -272,7 +272,7 @@ describe('Personalised driving gestures (guided setup)', () => {
 });
 
 describe('CalibrationSession', () => {
-  it('captures neutral, lock range and thumb range end-to-end', () => {
+  it('captures neutral and lock range end-to-end', () => {
     const session = new CalibrationSession(structuredClone(DEFAULT_SETTINGS.calibration));
     const dt = 1 / 30;
 
@@ -280,32 +280,21 @@ describe('CalibrationSession', () => {
     while (session.step === 'neutral') session.feed(makeWheelHands(0.1, 'grip', 'grip'), dt);
     expect(session.step).toBe('lock');
 
-    // Step 2: sweep to ±1.0 rad
+    // Step 2: sweep to ±1.0 rad; the session completes when the lock step ends
     let t = 0;
-    while (session.step === 'lock') {
-      const angle = 0.1 + Math.sin(t * 2) * 1.0;
-      session.feed(makeWheelHands(angle, 'grip', 'grip'), dt);
-      t += dt;
-    }
-    expect(session.step).toBe('throttle');
-
-    // Step 3: thumb-down sweep via hand rotation
-    t = 0;
     let done = false;
     while (!done && t < 10) {
-      const hands = makeWheelHands(0, 'grip', 'grip');
-      const rot = Math.sin(t * 1.5) * 0.3;
-      hands.right = makeTrackedHand('thumbDown', 'right', 0.35, 0.55, { rotation: rot });
-      done = session.feed(hands, dt);
+      const angle = 0.1 + Math.sin(t * 2) * 1.0;
+      done = session.feed(makeWheelHands(angle, 'grip', 'grip'), dt);
       t += dt;
     }
     expect(done).toBe(true);
+    expect(session.step).toBe('done');
 
     const result = session.getResult();
     expect(result.neutralAngle).toBeCloseTo(0.1, 1);
     expect(result.maxLockAngle).toBeGreaterThan(0.6);
     expect(result.maxLockAngle).toBeLessThan(1.1);
-    expect(result.throttleMaxAngle).toBeGreaterThan(result.throttleMinAngle);
     expect(result.calibratedAt).toBeGreaterThan(0);
   });
 });

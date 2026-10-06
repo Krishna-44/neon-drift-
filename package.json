@@ -2,6 +2,25 @@
   "name": "neondrift-gp",
   "version": "1.0.0",
   "description": "NEONDRIFT GP — gesture-controlled racing simulator. Webcam hand-tracking drives the car: no controller required.",
+  "keywords": [
+    "computer-vision",
+    "hand-tracking",
+    "gesture-recognition",
+    "mediapipe",
+    "threejs",
+    "webgl",
+    "racing-game",
+    "typescript",
+    "electron"
+  ],
+  "homepage": "https://krishna-44.github.io/neon-drift-/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Krishna-44/neon-drift-.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Krishna-44/neon-drift-/issues"
+  },
   "author": "Krishna",
   "license": "MIT",
   "type": "module",
