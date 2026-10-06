@@ -37,15 +37,33 @@ jobs:
           name: NEONDRIFT-GP-Windows-Installer
           path: release/NEONDRIFT-GP-Setup.exe
           if-no-files-found: error
+      # Only main (or a manual run) updates the public download; other
+      # branches just produce the artifact above.
       - name: Publish GitHub Release
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
           TAG="v$(node -p "require('./package.json').version")"
+          NAME=NEONDRIFT-GP-Setup.exe
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --target "$GITHUB_SHA" --latest \
+            # Passing the file to `create` keeps the release a draft until the
+            # upload finishes, so the public link never points at an empty release.
+            gh release create "$TAG" "release/$NAME" --target "$GITHUB_SHA" --latest \
               --title "NEONDRIFT GP $TAG (Windows)" \
-              --notes "Download **NEONDRIFT-GP-Setup.exe** below and run it. It installs the game and adds a desktop shortcut. If Windows SmartScreen warns (the app is unsigned), click **More info → Run anyway**."
+              --notes "Download **$NAME** below and run it. It installs the game and adds a desktop shortcut. If Windows SmartScreen warns (the app is unsigned), click **More info → Run anyway**."
+          else
+            # Replace without a download gap: upload under a temporary name,
+            # then delete the old asset and rename the new one into place.
+            TMP=NEONDRIFT-GP-Setup.next.exe
+            cp "release/$NAME" "release/$TMP"
+            gh release upload "$TAG" "release/$TMP" --clobber
+            api="repos/$GITHUB_REPOSITORY/releases"
+            asset_id() { gh api "$api/tags/$TAG" --jq ".assets[] | select(.name == \"$1\") | .id"; }
+            NEW_ID=$(asset_id "$TMP")
+            OLD_ID=$(asset_id "$NAME")
+            if [ -n "$OLD_ID" ]; then gh api -X DELETE "$api/assets/$OLD_ID"; fi
+            gh api -X PATCH "$api/assets/$NEW_ID" -f name="$NAME" >/dev/null
           fi
-          gh release upload "$TAG" release/NEONDRIFT-GP-Setup.exe --clobber
