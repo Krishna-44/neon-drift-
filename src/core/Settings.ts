@@ -17,9 +17,7 @@ export interface ControlSettings {
   steerSmoothing: number;
   /** Dead-zone in degrees around the calibrated wheel centre. */
   deadZoneDeg: number;
-  /** Throttle response curve exponent factor (0 = linear .. 0.6 = soft). */
-  throttleExpo: number;
-  /** Which hand drives thumb throttle/reverse: 'right' | 'left' | 'either'. */
+  /** Which hand's fist counts as throttle: 'right' | 'left' | 'either'. */
   throttleHand: 'right' | 'left' | 'either';
   /** Stability assist: yaw damping at the limit. */
   stabilityAssist: boolean;
@@ -36,9 +34,6 @@ export interface CalibrationData {
   neutralSpan: number;
   /** Angle (rad) the user reaches at full lock — maps to steer = ±1. */
   maxLockAngle: number;
-  /** Thumb throttle angle range captured by the wizard (radians below horizontal). */
-  throttleMinAngle: number;
-  throttleMaxAngle: number;
   calibratedAt: number; // epoch ms, 0 = never calibrated
 }
 
@@ -103,7 +98,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
     steerSensitivity: 1.0,
     steerSmoothing: 0.45,
     deadZoneDeg: 6,
-    throttleExpo: 0.25,
     throttleHand: 'either',
     stabilityAssist: true,
     counterSteerAssist: true,
@@ -113,8 +107,6 @@ export const DEFAULT_SETTINGS: GameSettings = {
     neutralAngle: 0,
     neutralSpan: 0.32,
     maxLockAngle: (75 * Math.PI) / 180,
-    throttleMinAngle: (15 * Math.PI) / 180,
-    throttleMaxAngle: (70 * Math.PI) / 180,
     calibratedAt: 0,
   },
   customGestures: [],
