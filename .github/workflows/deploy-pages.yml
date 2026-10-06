@@ -31,13 +31,9 @@ jobs:
         run: |
           if gh api "repos/${{ github.repository }}/pages" --silent 2>/dev/null; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
-          # Not enabled yet: try to switch it on (Source: GitHub Actions).
-          elif gh api -X POST "repos/${{ github.repository }}/pages" -f build_type=workflow; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::Enabled GitHub Pages (Source: GitHub Actions)."
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::GitHub Pages is not enabled for this repo and the workflow token can't enable it (Settings → Pages → Source: GitHub Actions). Skipping deploy."
+            echo "::notice::GitHub Pages is not enabled for this repo (Settings → Pages → Source: GitHub Actions). Skipping deploy."
           fi
 
   build:
