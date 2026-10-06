@@ -43,6 +43,7 @@
     "productName": "NEONDRIFT GP",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "electron/**/*"],
-    "win": { "target": "nsis" }
+    "win": { "target": "nsis" },
+    "nsis": { "artifactName": "NEONDRIFT-GP-Setup.${ext}" }
   }
 }

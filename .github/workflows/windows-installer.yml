@@ -1,6 +1,7 @@
-# Builds the Windows desktop installer (NEONDRIFT GP Setup x.y.z.exe).
-# Download it from the workflow run's "Artifacts" section. Running the
-# installer adds a desktop shortcut and a Start-menu entry.
+# Builds the Windows desktop installer (NEONDRIFT-GP-Setup.exe) and publishes
+# it as a GitHub Release, so anyone can download it without logging in:
+#   https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe
+# Running the installer adds a desktop shortcut and a Start-menu entry.
 name: Windows installer
 
 on:
@@ -9,7 +10,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # create/update the GitHub Release
+
+concurrency:
+  group: windows-installer
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -30,5 +35,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: NEONDRIFT-GP-Windows-Installer
-          path: release/*.exe
+          path: release/NEONDRIFT-GP-Setup.exe
           if-no-files-found: error
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v$(node -p "require('./package.json').version")"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --target "$GITHUB_SHA" --latest \
+              --title "NEONDRIFT GP $TAG (Windows)" \
+              --notes "Download **NEONDRIFT-GP-Setup.exe** below and run it. It installs the game and adds a desktop shortcut. If Windows SmartScreen warns (the app is unsigned), click **More info → Run anyway**."
+          fi
+          gh release upload "$TAG" release/NEONDRIFT-GP-Setup.exe --clobber

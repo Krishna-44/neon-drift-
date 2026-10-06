@@ -52,6 +52,11 @@ benchmarks, an adaptive-quality governor, and a multiplayer-ready telemetry tran
 
 ## Play now
 
+**On Windows — download and install (adds a desktop shortcut):**
+**[⬇ NEONDRIFT-GP-Setup.exe](https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe)**
+(all versions on the [Releases page](https://github.com/Krishna-44/neon-drift-/releases)). The app
+is unsigned, so if Windows SmartScreen warns, click **More info → Run anyway**.
+
 **In your browser — no install:** once GitHub Pages is enabled (see below), the game is live at
 **https://krishna-44.github.io/neon-drift-/**. Open it in Chrome or Edge, click **Enable Camera** (or
 **Use Demo + Keyboard**), then **Race**.
