@@ -26,7 +26,7 @@ export class CalibrationWizard {
     this.msg = el('div', { class: 'wizard-step-msg' });
     this.ring = el('i');
     const stepDots = el('div', { class: 'wizard-steps' });
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       const d = el('div', { class: 'ws' });
       this.steps.push(d);
       stepDots.append(d);
@@ -72,7 +72,7 @@ export class CalibrationWizard {
     const done = this.session.feed(hands, dt);
     this.msg.textContent = this.session.message;
     this.ring.style.width = `${(this.session.progress * 100).toFixed(0)}%`;
-    const order = ['neutral', 'lock', 'throttle', 'done'];
+    const order = ['neutral', 'lock', 'done'];
     const idx = order.indexOf(this.session.step);
     this.steps.forEach((d, i) => {
       d.classList.toggle('done', i < idx);

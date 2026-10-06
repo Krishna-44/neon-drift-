@@ -292,7 +292,6 @@ export class SettingsScreen {
         this.slider('Steering Sensitivity', () => s.control.steerSensitivity, (v) => (s.control.steerSensitivity = v), 0.5, 2, 0.05, (v) => v.toFixed(2)),
         this.slider('Steering Smoothing', () => s.control.steerSmoothing, (v) => (s.control.steerSmoothing = v), 0, 1, 0.05, (v) => v.toFixed(2)),
         this.slider('Dead Zone (deg)', () => s.control.deadZoneDeg, (v) => (s.control.deadZoneDeg = v), 0, 20, 1),
-        this.slider('Throttle Softness', () => s.control.throttleExpo, (v) => (s.control.throttleExpo = v), 0, 0.6, 0.05, (v) => v.toFixed(2)),
         this.select('Throttle Hand', [['either', 'Either'], ['right', 'Right'], ['left', 'Left']], () => s.control.throttleHand, (v) => (s.control.throttleHand = v as any)),
         this.toggle('Mirror Webcam', () => s.control.mirrorPreview, (v) => (s.control.mirrorPreview = v)),
         this.toggle('Stability Assist', () => s.control.stabilityAssist, (v) => (s.control.stabilityAssist = v)),

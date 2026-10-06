@@ -34,14 +34,15 @@ action from your hand.
 
 ## Calibration (do this first)
 
-**Menu → Calibrate Wheel.** Three quick steps captured from your own movement:
+**Menu → Calibrate Wheel.** Two quick steps captured from your own movement:
 
 1. **Neutral** — hold the wheel relaxed and level for ~2.5 s. Captures your wheel-centre angle and
    grip width.
 2. **Lock** — turn full-left then full-right as far as is comfortable. Captures your steering range
    (90 % of your reach maps to full lock, so you never have to strain).
-3. **Thumb sweep** — thumb-down and sweep from slightly-down to fully-down. Captures your thumb
-   angle range.
+
+Throttle and brake are discrete poses (fist / thumb-down), so they need no range calibration. To
+teach the game *your* version of each pose, use **Menu → Set Up Gestures**.
 
 Calibration is persisted; you only redo it if your seating/camera changes.
 
@@ -60,7 +61,6 @@ Inconsistent recordings are rejected with a prompt to retry.
 | **Steering Sensitivity** | Scales how much wheel angle → steer | …you want less arm movement (raise) or finer control (lower) |
 | **Steering Smoothing** | One-Euro strength on the steer signal | …steering feels jittery (raise) or laggy (lower) |
 | **Dead Zone** | Degrees around centre that read as straight | …the car drifts when you hold straight (raise) |
-| **Throttle Softness** | Expo curve on throttle | …throttle feels too on/off (raise for a softer centre) |
 | **Throttle Hand** | Which hand's fist gives gas | …you prefer your dominant hand |
 | **Stability / Counter-Steer Assist** | Yaw damping + auto counter-steer | …the car spins too easily (enable) |
 | **Adaptive Assists** | Auto-tunes the above from your driving | …you want the game to adjust to you |

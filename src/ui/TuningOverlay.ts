@@ -101,7 +101,6 @@ export class TuningOverlay {
       mk('Sensitivity', () => c.steerSensitivity, (v) => (c.steerSensitivity = v), 0.5, 2, 0.05, (v) => v.toFixed(2)),
       mk('Smoothing', () => c.steerSmoothing, (v) => (c.steerSmoothing = v), 0, 1, 0.05, (v) => v.toFixed(2)),
       mk('Dead-zone°', () => c.deadZoneDeg, (v) => (c.deadZoneDeg = v), 0, 20, 1, (v) => String(Math.round(v))),
-      mk('Throttle soft', () => c.throttleExpo, (v) => (c.throttleExpo = v), 0, 0.6, 0.05, (v) => v.toFixed(2)),
     ]);
   }
 
@@ -110,7 +109,7 @@ export class TuningOverlay {
   /** Called by App when smoothing slider changes elsewhere — keep sliders synced. */
   syncSliders(): void {
     const c = this.settings.data.control;
-    const vals = [c.steerSensitivity, c.steerSmoothing, c.deadZoneDeg, c.throttleExpo];
+    const vals = [c.steerSensitivity, c.steerSmoothing, c.deadZoneDeg];
     this.sliderInputs.forEach((inp, i) => (inp.value = String(vals[i])));
   }
 
