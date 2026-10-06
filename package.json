@@ -26,6 +26,7 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
+    "start": "vite --open",
     "dev": "vite",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
@@ -61,6 +62,7 @@
     "productName": "NEONDRIFT GP",
     "directories": { "output": "release" },
     "files": ["dist/**/*", "electron/**/*"],
-    "win": { "target": "nsis" }
+    "win": { "target": "nsis" },
+    "nsis": { "artifactName": "NEONDRIFT-GP-Setup.${ext}" }
   }
 }

@@ -12,6 +12,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[▶ Live demo](https://krishna-44.github.io/neon-drift-/)** ·
+**[⬇ Download for Windows](https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe)** ·
 [Architecture](docs/ARCHITECTURE.md) ·
 [Gesture guide](docs/GESTURES.md) ·
 [Roadmap](docs/ROADMAP.md)
@@ -78,6 +79,21 @@ Every driving gesture can be re-recorded with your own pose via **Set Up Gesture
 
 **Keyboard fallback:** `↑/W` throttle · `↓/S` brake · `←→/AD` steer · `Space` drift · `Shift` nitro ·
 `R` reverse · `C` camera · `V` record · `H` perf HUD · `Esc` pause.
+
+---
+
+## Play now
+
+- **Windows desktop app:** download
+  **[NEONDRIFT-GP-Setup.exe](https://github.com/Krishna-44/neon-drift-/releases/latest/download/NEONDRIFT-GP-Setup.exe)**
+  and run it — it installs the game and adds a desktop shortcut. The app is unsigned, so if Windows
+  SmartScreen warns, click **More info → Run anyway**. All versions are on the
+  [Releases page](https://github.com/Krishna-44/neon-drift-/releases).
+- **In the browser:** open the **[live demo](https://krishna-44.github.io/neon-drift-/)** in Chrome
+  or Edge, click **Enable Camera** (or **Use Demo + Keyboard**), then **Race**.
+- **From source:** `npm install && npm start` (opens http://localhost:5173).
+
+> Camera access needs `https://` or `localhost` — opening `index.html` straight from disk won't work.
 
 ---
 
